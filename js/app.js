@@ -10,12 +10,14 @@ import { ChatStore, newChat, chatTitleFrom, exportMarkdown, exportName } from '.
 import { $, toast, announce, showBanner, confirmDialog, promptDialog, openPopover, closePopover, popoverOpen, isMobile } from './ui.js';
 import { createMsgNode, paintMsg, paintActions, setStatus, emptyStateNode } from './messages.js';
 import { localSupported, webgpuAvailable } from './local.js';
-import { BACKEND_URL, LOG_LOCAL_MODEL } from './config.js';
+import { BACKEND_URL, LOG_LOCAL_MODEL, ADSENSE_CLIENT, ADSENSE_SLOT } from './config.js';
+import { createAds, showAdsDialog, ADS_PRIVACY_NOTE } from './ads.js';
 import { createTelemetry } from './telemetry.js';
 
 const chats = new ChatStore(store);
 // журнал на сервере владельца: включается только если задан BACKEND_URL и пользователь согласился
 const telemetry = createTelemetry({ backendUrl: BACKEND_URL, store, getSecrets: () => Object.values(state.keys || {}).concat([state.settings.customUrl]) });
+const ads = createAds({ client: ADSENSE_CLIENT, slot: ADSENSE_SLOT, store });      // выключено, пока ADSENSE_CLIENT пуст
 const S = state.settings;
 const nodes = { A: [], B: [] };          // refs отрисованных сообщений по слотам
 const boxes = { A: $('msgsA'), B: $('msgsB') };
@@ -339,17 +341,15 @@ function reportExchange(slot, userText, reply, p, model, msgs) {
 
 function paintPrivacy() {
   const on = telemetry.available;
-  $('logGroup').hidden = !on; $('logChip').hidden = !on;
-  $('privacyHint').textContent = on
+  $('logGroup').hidden = !on;
+  $('privacyHint').textContent = (on
     ? 'Запросы идут напрямую из вашего браузера к API провайдеров. Если вы согласились, тексты сообщений дополнительно сохраняются на сервере владельца сайта и могут быть прочитаны им (ключи, свой Base URL и системный промпт не отправляются). Бесплатные сервисы могут логировать запросы; AI Horde показывает промпты волонтёрам — не отправляйте личное.'
-    : 'Запросы идут напрямую из вашего браузера к API провайдеров. Бесплатные сервисы могут логировать запросы; AI Horde показывает промпты волонтёрам — не отправляйте личное.';
+    : 'Запросы идут напрямую из вашего браузера к API провайдеров. Бесплатные сервисы могут логировать запросы; AI Horde показывает промпты волонтёрам — не отправляйте личное.')
+    + (ads.enabled ? ADS_PRIVACY_NOTE : '');
   if (!on) return;
   const c = telemetry.consent;
   $('consentToggle').checked = c === 'yes';
   $('consentState').textContent = c === 'yes' ? 'Сообщения сохраняются на сервере владельца.' : c === 'no' ? 'Ничего не отправляется на сервер владельца.' : 'Выбор ещё не сделан — ничего не отправляется.';
-  $('logChip').textContent = c === 'yes' ? '● на сервере' : '○ локально';
-  $('logChip').classList.toggle('on', c === 'yes');
-  $('logChip').title = c === 'yes' ? 'Сообщения сохраняются на сервере владельца сайта. Нажмите, чтобы изменить.' : 'Сообщения не отправляются на сервер владельца. Нажмите, чтобы изменить.';
 }
 function setConsent(v, { announceIt = true } = {}) {
   telemetry.setConsent(v); paintPrivacy(); if (!slotMsgs('A').length) renderAll();
@@ -372,9 +372,26 @@ async function askConsentIfNeeded() {
   setConsent(v, { announceIt: false });
   toast(v ? 'Принято. Изменить выбор можно в «Настройки».' : 'Хорошо, ничего не сохраняется. Чат работает как обычно.', { ms: 3500 });
 }
+/* ---- реклама (только если задан ADSENSE_CLIENT) ---- */
+function paintAds() {
+  $('adsGroup').hidden = !ads.enabled;
+  if (!ads.enabled) return;
+  const c = ads.consent;
+  $('adsConsentSel').value = c;
+  $('adsState').textContent = c === 'personal' ? 'Реклама Google может использовать cookies для персонализации. Изменение применится после перезагрузки страницы.'
+    : c === 'nonpersonal' ? 'Показывается только неперсонализированная реклама. Изменение применится после перезагрузки страницы.'
+    : 'Выбор ещё не сделан — реклама не загружается.';
+}
+async function askAdsIfNeeded() {
+  try {
+    if (!ads.enabled) return;
+    if (ads.needsAsk) { ads.setConsent(await showAdsDialog()); paintAds(); paintPrivacy(); }
+    ads.load();
+  } catch { /* реклама не должна ломать чат */ }
+}
 function bindPrivacy() {
+  $('adsConsentSel').onchange = () => { if (ads.setConsent($('adsConsentSel').value)) { paintAds(); toast('Выбор для рекламы сохранён. Изменение применится после перезагрузки страницы.', { ms: 3500 }); } };
   $('consentToggle').onchange = () => setConsent($('consentToggle').checked);
-  $('logChip').onclick = () => { if (isMobile()) openSidebar(true); else if (!sidebarIsOpen()) openSidebar(true); setTab('settings', true); setTimeout(() => $('consentToggle').focus(), 50); };
   $('deleteMyDataBtn').onclick = async () => {
     const ok = await confirmDialog({ title: 'Удалить мои данные с сервера?', html: '<p>Все сообщения, сохранённые на сервере владельца под этим браузером, будут удалены. Переписка в самом браузере останется.</p>', ok: 'Удалить', danger: true });
     if (!ok) return;
@@ -845,7 +862,7 @@ async function init() {
   $('systemPrompt').value = S.system || ''; $('presetSel').value = ''; // заполняется в bind()
   $('temp').value = S.temp; $('tempOut').textContent = (+S.temp).toFixed(1); $('maxTokens').value = String(S.maxTokens || 0);
   $('customUrl').value = S.customUrl; $('customModel').value = S.customModel; $('proxyUrl').value = S.proxy || ''; setProxy(S.proxy);
-  bind(); bindPrivacy(); paintPrivacy();
+  bind(); bindPrivacy(); paintPrivacy(); paintAds();
   $('presetSel').value = SYSTEM_PRESETS.some(x => x.id === S.preset) || S.preset === '__custom' ? S.preset : '';
   initScroll('A'); initScroll('B');
   setTab(['chats', 'model', 'settings'].includes(S.tab) ? S.tab : 'model');
@@ -862,6 +879,6 @@ async function init() {
   setTimeout(() => { for (const p of PROVIDERS.filter(x => x.group === 'keyless' && !x.noModelsEndpoint)) if (!state.lists[p.id]) loadList(p.id).then(() => renderSlotCard('A')); }, 1500);
   window.__fah = { state, chats, PROVIDERS, send, loadList, runCheck, renderAll, selectProvider, ensureModel, telemetry };    // для отладки и тестов
   document.documentElement.dataset.ready = '1';
-  askConsentIfNeeded();
+  askConsentIfNeeded().then(askAdsIfNeeded, askAdsIfNeeded);
 }
 init();

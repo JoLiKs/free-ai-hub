@@ -726,15 +726,19 @@ dialog.dialog h2{margin:0;font-size:18px}
 }
 @media (forced-colors:active){.cyber body::before,.cyber body::after{display:none}}
 
-/* --- журнал на сервере владельца: чип в шапке и диалог согласия --- */
-.log-chip{border:1px solid var(--line2);background:var(--surface);color:var(--muted);border-radius:99px;padding:5px 12px;font-size:12.5px;white-space:nowrap}
-.log-chip.on{color:var(--warn);border-color:var(--warn)}
-.log-chip:hover{background:var(--surface2)}
+/* --- диалог согласия (журнал на сервере владельца) --- */
 dialog.consent{max-width:min(500px,94vw)}
 dialog.consent h2{font-size:19px}
 dialog.consent .dialog-actions{flex-wrap:wrap}
 dialog.consent .dialog-actions .btn{flex:1 1 150px;justify-content:center}
-@media (max-width:560px){.log-chip{max-width:120px;overflow:hidden;text-overflow:ellipsis;padding:4px 8px;font-size:11.5px}}
-.cyber .log-chip{border-radius:0;font-family:var(--mono);background:#0b0618;border-color:#5a3fa0}
-.cyber .log-chip.on{color:var(--yel);border-color:var(--yel);box-shadow:0 0 10px -4px var(--yel)}
 .cyber dialog.consent p{color:#e9e1ff}
+
+/* --- реклама (только если в js/config.js задан ADSENSE_CLIENT и ADSENSE_SLOT) --- */
+/* Плашка внизу боковой панели: пока объявление не загрузилось, высота 0 (пустого блока нет), ширина при этом нормальная. */
+.ad-box{flex:none;max-height:0;overflow:hidden;visibility:hidden;margin:0 16px;padding:0;border:0 solid var(--line);border-radius:var(--radius-s);background:var(--surface);position:relative;transition:max-height .2s ease}
+.ad-box.filled{max-height:130px;visibility:visible;margin:8px 16px calc(12px + env(safe-area-inset-bottom));border-width:1px;padding:16px 6px 6px}
+.ad-box .ad-label{position:absolute;top:2px;left:8px;font-size:10px;line-height:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.ad-box ins.adsbygoogle{width:100%;max-height:100px;overflow:hidden}
+.cyber .ad-box{border-radius:0;border-color:#5a3fa0;background:#0b0618}
+.cyber .ad-box .ad-label{font-family:var(--mono);color:var(--cya)}
+dialog.ads-consent .dialog-actions .btn{flex:1 1 180px}

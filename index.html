@@ -17,7 +17,7 @@
       var m = document.querySelector('meta[name=theme-color]'); if (m) m.content = cy ? '#07040f' : d === 'light' ? '#f5f6fa' : '#0a0d14'; } catch (e) {}
   </script>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="style.css?v=2.3">
+  <link rel="stylesheet" href="style.css?v=2.5">
 </head>
 <body>
 <a class="skip" href="#input">Перейти к вводу сообщения</a>
@@ -147,6 +147,16 @@
           <p class="hint" id="consentState" aria-live="polite"></p>
           <button class="btn wide" id="deleteMyDataBtn" type="button">Удалить мои данные с сервера</button>
         </div>
+        <div class="group" id="adsGroup" hidden>
+          <span class="lbl">Реклама</span>
+          <label class="sr-only" for="adsConsentSel">Тип рекламы</label>
+          <select id="adsConsentSel" class="field">
+            <option value="" disabled>Выбор ещё не сделан — реклама не загружается</option>
+            <option value="personal">Персонализированная реклама (Google, cookies)</option>
+            <option value="nonpersonal">Только неперсонализированная</option>
+          </select>
+          <p class="hint" id="adsState" aria-live="polite">Реклама показывается сервисом Google AdSense и может использовать cookies.</p>
+        </div>
         <p class="hint" id="privacyHint">Запросы идут напрямую из вашего браузера к API провайдеров. Бесплатные сервисы могут логировать запросы; AI Horde показывает промпты волонтёрам — не отправляйте личное.</p>
       </section>
     </div>
@@ -158,7 +168,6 @@
       <button class="icon-btn" id="openSidebar" type="button" aria-label="Открыть панель" aria-controls="sidebar"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>
       <button class="cur" id="curLabel" type="button" aria-haspopup="dialog" title="Выбрать модель (Ctrl+K)"></button>
       <div class="spacer"></div>
-      <button class="log-chip" id="logChip" type="button" hidden></button>
       <button class="cyber-btn" id="cyberBtn" type="button" aria-pressed="false" title="Кибер-панк: неоновая тема (вкл/выкл)"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M13.5 2 4.5 13.5H11l-1.5 8.5 9-11.5H12.5z"/></svg><span class="cb-text">Кибер-панк</span></button>
       <div class="menu-wrap">
         <button class="icon-btn" id="exportBtn" type="button" aria-label="Экспорт чата" aria-haspopup="menu" aria-expanded="false" title="Экспорт чата"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg></button>

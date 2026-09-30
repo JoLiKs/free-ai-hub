@@ -78,6 +78,7 @@ js/  util, highlight, markdown      — утилиты, подсветка, mark
      generate, local, local-worker  — генерация, локальная модель в Web Worker
      chats, store, state            — история чатов, localStorage, состояние
      ui, messages, app              — DOM: поповеры, сообщения, обработчики
+     config, telemetry, ads         — настройки развёртывания, журнал (необязательно), реклама AdSense (необязательно)
 tests/  markdown.test.mjs, api.test.mjs   — юнит-тесты (node, без зависимостей)
         health.mjs                        — живая проверка провайдеров
         candidates.mjs                    — проверка кандидатов в новые источники
@@ -93,6 +94,7 @@ node tests/run-all.mjs                            # все офлайн-тест
 node tests/markdown.test.mjs                      # 24 теста: markdown, XSS-экранирование
 node tests/proxy.test.mjs                         # 5 тестов CORS-прокси (белый список, ALLOWED_ORIGINS)
 node tests/api.test.mjs                           # 33 теста: SSE, ретраи, лимитер, чаты, кэш моделей
+node tests/ads.test.mjs                           # 14 тестов: формат ID AdSense, реклама выключена по умолчанию, set-ads.sh
 node tests/health.mjs                             # живой health-check всех бесключевых моделей
 node tests/health.mjs --provider ovh --patient    # OVH: ждать сброса лимита 2/мин и повторять
 node tests/health.mjs --origin https://ваш.сайт   # проверка с вашего Origin (важно для Pollinations)
@@ -132,9 +134,25 @@ Node ≥ 18, зависимостей нет.
 - История чатов, настройки и ключи — в `localStorage` вашего браузера («Сбросить» — в настройках).
 - Режим «В браузере» — единственный, где текст не покидает устройство; при первом запуске он скачивает библиотеку с jsDelivr и веса с Hugging Face.
 
+- **Реклама** упоминается только если владелец включил AdSense (`ADSENSE_CLIENT` в `js/config.js`): тогда в «Настройки → Приватность» добавляется абзац о Google AdSense и cookies, а рекламный скрипт грузится лишь после согласия.
+
 ## Необязательный бэкенд и админ-панель (`backend/`)
 
 Python-сервис (FastAPI + SQLite) для владельца сайта: принимает сообщения **только от согласившихся пользователей** и показывает их в админ-панели `/admin` (сессии, переписка, поиск, фильтры, статистика, экспорт, удаление, пауза записи). Развёртывание на своём сервере — Docker или systemd (`backend/deploy.sh`). Подробности, переменные окружения, безопасность и резервное копирование — в [`backend/README.md`](backend/README.md). Включение в сайте: `./set-backend-url.sh https://chat-log.example.com` (правит `js/config.js`), а адрес сайта добавляется в `ALLOWED_ORIGINS` на сервере. Тесты: `cd backend && pip install -r requirements-dev.txt && pytest -q` (86 тестов); браузерные — `tests/browser/consent-backend.cjs`, `admin-xss.cjs`.
+
+## Необязательная реклама Google AdSense (выключена по умолчанию)
+
+По умолчанию реклама **полностью отключена**: `ADSENSE_CLIENT` в `js/config.js` пуст, скрипт Google не загружается, никаких окон и блоков нет. Чтобы включить:
+
+```bash
+./set-ads.sh ca-pub-1234567890123456            # авто-реклама (Auto ads: включите в кабинете AdSense), на странице ничего не рисуется
+./set-ads.sh ca-pub-1234567890123456 9876543210 # + одна плашка «Реклама» внизу боковой панели (ID рекламного блока)
+./set-ads.sh ""                                 # выключить и удалить ads.txt
+```
+
+Скрипт проверяет формат (`ca-pub-` + 10–20 цифр; slot — только цифры), правит `js/config.js` и создаёт **`ads.txt`** в корне сайта: `google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0` (файл должен открываться по `https://ваш-сайт/ads.txt`; его нужно публиковать вместе с сайтом, иначе AdSense покажет предупреждение).Google ищет `ads.txt` только в корне домена/поддомена: на Cloudflare Pages (`https://free-ai-hub-94p.pages.dev/ads.txt`) или своём домене это работает, а у проекта на GitHub Pages сайт лежит в подпапке (`joliks.github.io/free-ai-hub/`), поэтому там `ads.txt` в корне домена не виден (нужен репозиторий `<user>.github.io` или свой домен). Также AdSense может не одобрять сайты на бесплатных поддоменах — это решается в кабинете AdSense, не в коде.
+
+Как это работает (`js/ads.js`): при первом визите — отдельное окно «Реклама на сайте» («Принимаю» / «Только неперсонализированная»; Esc выбор не заменяет). Скрипт `pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=…` (async, crossorigin) добавляется **только после выбора**; при «Только неперсонализированная» перед загрузкой ставится `adsbygoogle.requestNonPersonalizedAds = 1`. Выбор хранится в `localStorage` (`fah.settings.adsConsent`) и меняется в «Настройки → Реклама» (применяется после перезагрузки). Блокировщик рекламы или сбой сети ничего не ломают; пока объявление не загрузилось, плашка «Реклама» скрыта (пустой блок не показывается). Service worker не перехватывает и не кэширует чужие домены; CSP в приложении не задан, так что домены Google ничем не блокируются (если вы добавите CSP на хостинге — разрешите `pagead2.googlesyndication.com`, `googleads.g.doubleclick.net`, `*.google.com`, `*.gstatic.com`). Согласие на рекламу не связано с согласием на сохранение сообщений на сервере. Тесты: `tests/ads.test.mjs`, `tests/browser/ads.cjs`.
 
 ## Отвергнутые источники (проверено; причины)
 

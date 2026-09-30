@@ -30,7 +30,7 @@ async function chat(p,text){ await p.click('#input'); await p.type('#input',text
   // ---------- 1. BACKEND_URL пуст ----------
   { const ctx=await b.createBrowserContext(); const seen=[]; const p=await open(ctx,{url:SITE_OFF}); await mockNet(p,seen);
     ok(await p.evaluate(()=>!document.querySelector('dialog#consentDialog')),'BACKEND_URL пуст: уведомление НЕ показано');
-    ok(await p.evaluate(()=>document.getElementById('logChip').hidden && document.getElementById('logGroup').hidden),'BACKEND_URL пуст: чип и блок настроек скрыты');
+    ok(await p.evaluate(()=>!document.getElementById('logChip') && document.getElementById('logGroup').hidden),'BACKEND_URL пуст: чипа в шапке нет, блок настроек скрыт');
     await chat(p,'проверка без бэкенда');
     ok(await p.evaluate(()=>document.querySelectorAll('#msgsA .msg').length)>=2,'чат работает без бэкенда');
     ok(seen.length===0,'ничего не отправляется на сервер ('+seen.length+')');

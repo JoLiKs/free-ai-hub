@@ -5,7 +5,7 @@ import { newChat } from './chats.js';
 
 export const DEFAULT_SETTINGS = {
   provider: 'ovh', models: {}, providerB: 'chat', modelB: '', compare: false,
-  system: '', preset: '', temp: 0.7, maxTokens: 0, autoFallback: true, theme: 'auto', cyber: false,
+  system: '', preset: '', temp: 0.7, maxTokens: 0, autoFallback: true, theme: 'dark', cyber: false,
   customUrl: '', customModel: '', tab: 'model', localOk: {}, lastChat: '', proxy: ''
 };
 

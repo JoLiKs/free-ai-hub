@@ -24,19 +24,17 @@ const dotClass = h => (h ? h.s : 'unk');
 
 /* ============================== тема ============================== */
 const THEME_ICON = {
-  auto: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17" /><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor" stroke="none"/></svg>',
   dark: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>',
   light: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M18.7 5.3l-1.8 1.8M7.1 16.9l-1.8 1.8"/></svg>'
 };
-const mqLight = matchMedia('(prefers-color-scheme: light)');
 function applyTheme() {
-  const pref = S.theme || 'auto', cyber = S.cyber === true;
-  // кибер-панк всегда работает поверх тёмной темы; при выключении возвращается выбранная тема (авто/тёмная/светлая)
-  const eff = cyber ? 'dark' : pref === 'auto' ? (mqLight.matches ? 'light' : 'dark') : pref;
+  const pref = S.theme === 'light' ? 'light' : 'dark', cyber = S.cyber === true;
+  // кибер-панк всегда работает поверх тёмной темы; при выключении возвращается выбранная тема (тёмная/светлая)
+  const eff = cyber ? 'dark' : pref;
   document.documentElement.dataset.theme = eff; document.documentElement.dataset.themePref = pref;
   document.documentElement.classList.toggle('cyber', cyber);
   const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = cyber ? '#07040f' : eff === 'light' ? '#f5f6fa' : '#0a0d14';
-  $('themeBtn').innerHTML = THEME_ICON[pref]; $('themeBtn').title = 'Тема: ' + ({ auto: 'как в системе', dark: 'тёмная', light: 'светлая' }[pref]);
+  $('themeBtn').innerHTML = THEME_ICON[pref]; $('themeBtn').title = 'Тема: ' + ({ dark: 'тёмная', light: 'светлая' }[pref]);
   $('themeSel').value = pref;
   $('cyberBtn').setAttribute('aria-pressed', String(cyber));
 }
@@ -45,9 +43,8 @@ function toggleCyber() {
   const root = document.documentElement;
   if (S.cyber) { root.classList.add('cy-boot'); setTimeout(() => root.classList.remove('cy-boot'), 700); }
   applyTheme();
-  toast(S.cyber ? '⚡ Кибер-панк включён' : 'Кибер-панк выключен — вернулась тема «' + ({ auto: 'как в системе', dark: 'тёмная', light: 'светлая' }[S.theme || 'auto']) + '»');
+  toast(S.cyber ? '⚡ Кибер-панк включён' : 'Кибер-панк выключен — вернулась тема «' + ({ dark: 'тёмная', light: 'светлая' }[S.theme === 'light' ? 'light' : 'dark']) + '»');
 }
-mqLight.addEventListener('change', () => { if ((S.theme || 'auto') === 'auto') applyTheme(); });
 
 /* ============================== вкладки ============================== */
 function setTab(t, focus) {
@@ -678,7 +675,7 @@ function bind() {
   $('maxTokens').onchange = () => { S.maxTokens = parseInt($('maxTokens').value, 10) || 0; saveSettings(); };
   $('themeSel').onchange = () => { S.theme = $('themeSel').value; saveSettings(); applyTheme(); };
   $('cyberBtn').onclick = toggleCyber;
-  $('themeBtn').onclick = () => { const order = ['auto', 'dark', 'light']; S.theme = order[(order.indexOf(S.theme || 'auto') + 1) % 3]; saveSettings(); applyTheme(); toast('Тема: ' + $('themeBtn').title.replace('Тема: ', '')); };
+  $('themeBtn').onclick = () => { S.theme = S.theme === 'light' ? 'dark' : 'light'; saveSettings(); applyTheme(); toast('Тема: ' + $('themeBtn').title.replace('Тема: ', '')); };
 
   // чаты
   $('newChatBtn').onclick = newChatAction;

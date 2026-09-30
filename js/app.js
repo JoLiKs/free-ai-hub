@@ -30,12 +30,22 @@ const THEME_ICON = {
 };
 const mqLight = matchMedia('(prefers-color-scheme: light)');
 function applyTheme() {
-  const pref = S.theme || 'auto';
-  const eff = pref === 'auto' ? (mqLight.matches ? 'light' : 'dark') : pref;
+  const pref = S.theme || 'auto', cyber = S.cyber === true;
+  // кибер-панк всегда работает поверх тёмной темы; при выключении возвращается выбранная тема (авто/тёмная/светлая)
+  const eff = cyber ? 'dark' : pref === 'auto' ? (mqLight.matches ? 'light' : 'dark') : pref;
   document.documentElement.dataset.theme = eff; document.documentElement.dataset.themePref = pref;
-  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = eff === 'light' ? '#f5f6fa' : '#0a0d14';
+  document.documentElement.classList.toggle('cyber', cyber);
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = cyber ? '#07040f' : eff === 'light' ? '#f5f6fa' : '#0a0d14';
   $('themeBtn').innerHTML = THEME_ICON[pref]; $('themeBtn').title = 'Тема: ' + ({ auto: 'как в системе', dark: 'тёмная', light: 'светлая' }[pref]);
   $('themeSel').value = pref;
+  $('cyberBtn').setAttribute('aria-pressed', String(cyber));
+}
+function toggleCyber() {
+  S.cyber = !(S.cyber === true); saveSettingsNow();
+  const root = document.documentElement;
+  if (S.cyber) { root.classList.add('cy-boot'); setTimeout(() => root.classList.remove('cy-boot'), 700); }
+  applyTheme();
+  toast(S.cyber ? '⚡ Кибер-панк включён' : 'Кибер-панк выключен — вернулась тема «' + ({ auto: 'как в системе', dark: 'тёмная', light: 'светлая' }[S.theme || 'auto']) + '»');
 }
 mqLight.addEventListener('change', () => { if ((S.theme || 'auto') === 'auto') applyTheme(); });
 
@@ -667,6 +677,7 @@ function bind() {
   $('temp').oninput = () => { S.temp = parseFloat($('temp').value); $('tempOut').textContent = S.temp.toFixed(1); saveSettings(); };
   $('maxTokens').onchange = () => { S.maxTokens = parseInt($('maxTokens').value, 10) || 0; saveSettings(); };
   $('themeSel').onchange = () => { S.theme = $('themeSel').value; saveSettings(); applyTheme(); };
+  $('cyberBtn').onclick = toggleCyber;
   $('themeBtn').onclick = () => { const order = ['auto', 'dark', 'light']; S.theme = order[(order.indexOf(S.theme || 'auto') + 1) % 3]; saveSettings(); applyTheme(); toast('Тема: ' + $('themeBtn').title.replace('Тема: ', '')); };
 
   // чаты

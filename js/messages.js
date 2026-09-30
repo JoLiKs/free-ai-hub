@@ -128,7 +128,7 @@ export function setStatus(refs, s) {
 export function emptyStateNode(suggestions, onPick, ctx = {}) {
   const d = document.createElement('div'); d.className = 'empty';
   d.innerHTML = `<div class="hero-logo" aria-hidden="true"><svg viewBox="0 0 64 64" width="34" height="34"><path d="M32 10l5.2 14L51 29.2 37.2 34.4 32 48.4l-5.2-14L13 29.2 26.8 24z" fill="currentColor"/><path d="M50 8l1.8 4.6L56.4 14l-4.6 1.8L50 20.4l-1.8-4.6L43.6 14l4.6-1.4z" fill="currentColor" opacity=".7"/></svg></div>
-    <h2>${esc(ctx.title || 'Чем помочь?')}</h2>
+    <h2 data-text="${esc(ctx.title || 'Чем помочь?')}">${esc(ctx.title || 'Чем помочь?')}</h2>
     <p>${esc(ctx.sub || 'Выберите модель в боковой панели и задайте вопрос. Всё работает без регистрации и ключей — запросы уходят напрямую к бесплатным AI API.')}</p>
     <div class="cards"></div>`;
   const cards = d.querySelector('.cards');

@@ -53,3 +53,23 @@
 - 03:32 — Поиск по тексту чатов; тест `tests/browser/attach.cjs` (картинки); подсказка на пустом экране для локальной модели; WebLLM в отвергнутых (нет WebGPU-адаптера в песочнице). Источники: freeinferencing.com (113 предложений), Hetzner Inference (нужен токен), FreeInference.org (нужен ключ), DreamPrompting (аккаунт), PersorAI (404), JankRouter (Pro-ключ) — новых бесключевых браузерных нет. Монитор 03:11: 37 (Horde 20/22 по статусу воркеров; OVH 12/12, ch.at 1, LLM7 3/4, Pollinations 1). Реальные ответы в UI: Pollinations (0,6 с), ch.at, OVH Qwen3.5-9B (vision), Mistral-7B в режиме сравнения.
 - 03:52 — Исправлено: обрыв потока показывал «CORS» → теперь «Соединение оборвалось…» (тест +1, всего 24+33+5). Проверено: двойной Enter, «новый чат» и удаление чата во время стриминга, прогон полного набора браузерных тестов (axe 0, xss, keyboard, focus-trap, offline SW, import-xss, attach, continue) и Firefox — без ошибок. api.airforce/keylessai/JankRouter/PersorAI перепроверены — не работают без ключа. Решение: значимых улучшений почти не осталось — перехожу к финальному QA (не буду имитировать работу до 07:00).
 - 03:58 — Redeploy (один раз): ZeroDeploy принял архив (HTTP 200), но `rough-shape-307.zerodeploy.app` по-прежнему HTTP 451 (сайт заблокирован хостингом) → вторую попытку/новый дроп не делал (это выглядело бы как обход блокировки). Итог мониторинга: 37–40 моделей; последний прогон 03:54 — **38** (OVH 12/12, ch.at 1/1, LLM7 3/4, Horde 21/23, Pollinations 1/1). Монитор-обезьяна 90+60 с — без ошибок страницы.
+
+---
+
+## Раунд 6 — бэкенд журнала чатов + админ-панель + согласие (2026-09-30, 12:00–12:45 Минск)
+
+Задача владельца: (1) Python-бэкенд на его сервере, (2) админ-панель для просмотра переписок. Работа только локально: **ничего не задеплоено, живой репозиторий GitHub не менялся, учётные данные не использовались.**
+
+**Сделано**
+- `backend/` — FastAPI + SQLite (stdlib), зависимости только fastapi/uvicorn. API: `POST /api/log`, `DELETE /api/session/{id}`, `GET /api/health`, админ-API `/api/admin/*`, статика `/admin`. Хеш IP с суточной солью, страна из `CF-IPCountry`, `RETENTION_DAYS` + фоновая очистка, лимиты (размер тела, длина текста, запросов/мин на IP, суточный объём, размер БД), CORS по `ALLOWED_ORIGINS` (поддержка `*.pages.dev`, `127.0.0.1:*`), пауза записи.
+- Админка: вход (scrypt + compare_digest, подписанная кука HttpOnly/Secure/SameSite=Strict/`__Host-`, CSRF-заголовок + проверка Origin, блокировка перебора по IP + общий предохранитель, отзыв сессии), сессии/переписка/поиск/фильтры/статистика/экспорт JSON+CSV/удаление/«удалить всё»/пауза. Вывод текста только через textContent. CSP без inline.
+- Деплой-файлы: Dockerfile, docker-compose.yml, systemd, Caddyfile, nginx.conf, `deploy.sh` (SERVER_* через env, DRY_RUN).
+- Сайт: `js/config.js` (BACKEND_URL пуст), `js/telemetry.js`, окно согласия, чип в шапке, переключатель + «Удалить мои данные с сервера», тексты приватности в UI и README, `set-backend-url.sh`, sw cache `fah-v2-shell-2.3-log`, CHANGELOG.
+
+**Проверено**
+- `pytest`: 86 passed (auth, CSRF, lockout, validation, rate limit, retention, CORS, XSS/CSV/SQL, заголовки, IP не в БД).
+- `node tests/run-all.mjs`: 24 + 33 + 5 + 9 (telemetry) — всё зелёное.
+- Браузер (headless Chrome, моки моделей, реальный бэкенд на свободном порту): `consent-backend.cjs` — 26 проверок (BACKEND_URL пуст → нет уведомления и нет запросов; отказ → ничего не уходит; согласие → событие уходит; ключ/URL/системный промпт не в теле; ключ из текста вырезается; удаление своих данных; выключение; недоступный бэкенд не ломает чат) — ALL OK. `admin-xss.cjs` — ALL OK. Старые браузерные тесты (xss, keyboard, cyber, axe dark/light, a11y-drawer, attach, continue, import-xss, offline-sw) — без регрессий (единственное замечание axe в режиме кибер-панк — `aria-required-children` у списка провайдеров в поповере — существовало до этого раунда и не связано с новыми правками).
+- Исправленные по ходу дефекты: поле `MAX_BODY_BYTES` (120 КБ) было мало для 2×20 000 кириллических символов в JSON → 400 КБ; чип в шапке был слишком длинным на мобильном → «● на сервере / ○ локально»; тест-«обещание» innerHTML совпадал с комментарием в app.js; таймаут теста при «упавшем» бэкенде.
+
+**Не проверено (честно)**: Docker, docker-compose, systemd, Caddy/nginx конфиги и `deploy.sh` (только `bash -n` и DRY_RUN) — в среде нет Docker/systemd/Caddy/nginx/сервера. Cloudflare Pages не проверялся. Поведение `sendBeacon` не используется (выбран `fetch keepalive` + `text/plain`, чтобы не было preflight). Firefox/Safari для нового UI не гонялись. Реальный заголовок `CF-IPCountry` проверен только заголовком в тестах.

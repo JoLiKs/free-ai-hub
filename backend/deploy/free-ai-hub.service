@@ -1,0 +1,36 @@
+# /etc/systemd/system/free-ai-hub.service
+# Предполагается: код в /opt/free-ai-hub/backend, venv в /opt/free-ai-hub/backend/.venv, секреты в /etc/free-ai-hub.env (chmod 600), данные в /var/lib/free-ai-hub
+[Unit]
+Description=Free AI Hub backend (FastAPI)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fah
+Group=fah
+WorkingDirectory=/opt/free-ai-hub/backend
+EnvironmentFile=/etc/free-ai-hub.env
+Environment=HOST=127.0.0.1 PORT=8080 DB_PATH=/var/lib/free-ai-hub/fah.db
+ExecStart=/opt/free-ai-hub/backend/.venv/bin/python -m app
+Restart=on-failure
+RestartSec=3
+
+# Ограничения
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/free-ai-hub
+StateDirectory=free-ai-hub
+StateDirectoryMode=0700
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+CapabilityBoundingSet=
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

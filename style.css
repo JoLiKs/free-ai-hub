@@ -725,3 +725,16 @@ dialog.dialog h2{margin:0;font-size:18px}
   .cyber .typing i{transform:scaleY(.8)}
 }
 @media (forced-colors:active){.cyber body::before,.cyber body::after{display:none}}
+
+/* --- журнал на сервере владельца: чип в шапке и диалог согласия --- */
+.log-chip{border:1px solid var(--line2);background:var(--surface);color:var(--muted);border-radius:99px;padding:5px 12px;font-size:12.5px;white-space:nowrap}
+.log-chip.on{color:var(--warn);border-color:var(--warn)}
+.log-chip:hover{background:var(--surface2)}
+dialog.consent{max-width:min(500px,94vw)}
+dialog.consent h2{font-size:19px}
+dialog.consent .dialog-actions{flex-wrap:wrap}
+dialog.consent .dialog-actions .btn{flex:1 1 150px;justify-content:center}
+@media (max-width:560px){.log-chip{max-width:120px;overflow:hidden;text-overflow:ellipsis;padding:4px 8px;font-size:11.5px}}
+.cyber .log-chip{border-radius:0;font-family:var(--mono);background:#0b0618;border-color:#5a3fa0}
+.cyber .log-chip.on{color:var(--yel);border-color:var(--yel);box-shadow:0 0 10px -4px var(--yel)}
+.cyber dialog.consent p{color:#e9e1ff}

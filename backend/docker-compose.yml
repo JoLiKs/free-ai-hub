@@ -1,0 +1,22 @@
+# docker compose up -d --build     (нужен файл .env рядом; см. .env.example)
+services:
+  backend:
+    build: .
+    image: free-ai-hub-backend:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8080"
+      DB_PATH: /data/fah.db
+    volumes:
+      - fah-data:/data
+    # Наружу порт НЕ публикуется на все интерфейсы: только localhost, дальше — HTTPS-прокси (Caddy/nginx).
+    ports:
+      - "127.0.0.1:8080:8080"
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+volumes:
+  fah-data:

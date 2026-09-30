@@ -10,8 +10,12 @@ import { ChatStore, newChat, chatTitleFrom, exportMarkdown, exportName } from '.
 import { $, toast, announce, showBanner, confirmDialog, promptDialog, openPopover, closePopover, popoverOpen, isMobile } from './ui.js';
 import { createMsgNode, paintMsg, paintActions, setStatus, emptyStateNode } from './messages.js';
 import { localSupported, webgpuAvailable } from './local.js';
+import { BACKEND_URL, LOG_LOCAL_MODEL } from './config.js';
+import { createTelemetry } from './telemetry.js';
 
 const chats = new ChatStore(store);
+// журнал на сервере владельца: включается только если задан BACKEND_URL и пользователь согласился
+const telemetry = createTelemetry({ backendUrl: BACKEND_URL, store, getSecrets: () => Object.values(state.keys || {}).concat([state.settings.customUrl]) });
 const S = state.settings;
 const nodes = { A: [], B: [] };          // refs отрисованных сообщений по слотам
 const boxes = { A: $('msgsA'), B: $('msgsB') };
@@ -316,9 +320,70 @@ function emptyCtx() {
   const p = slotProvider('A');
   if (p.group === 'key' && p.keyMode === 'required' && !getKey(p.id)) return { title: 'Нужен ключ для «' + p.name + '»', sub: 'Добавьте бесплатный ключ в блоке «Свой ключ» слева — или выберите провайдера без ключа (OVHcloud, ch.at, LLM7).' };
   if (p.type === 'local') return { title: 'Чем помочь?', sub: 'Модель работает прямо в вашем браузере: при первом запуске скачивается один раз, дальше — офлайн, текст никуда не отправляется.' };
-  return { title: 'Чем помочь?', sub: 'Выберите модель в боковой панели и задайте вопрос. Запросы уходят напрямую к бесплатным AI API — без регистрации и ключей.' };
+  return { title: 'Чем помочь?', sub: 'Выберите модель в боковой панели и задайте вопрос. Запросы уходят напрямую к бесплатным AI API — без регистрации и ключей.' + (telemetry.enabled ? ' Сообщения также сохраняются на сервере владельца сайта (вы согласились; изменить — в «Настройки»).' : '') };
 }
 function renderAll() { paintAttach(); renderSlot('A'); if (S.compare) renderSlot('B'); else { boxes.B.innerHTML = ''; nodes.B = []; } }
+
+/* ============================== журнал на сервере владельца (только с согласия) ============================== */
+function reportExchange(slot, userText, reply, p, model, msgs) {
+  try {
+    if (!telemetry.enabled || reply.error || !reply.content) return;
+    if (p.type === 'local' && !LOG_LOCAL_MODEL) return;        // режим «в браузере» обещает, что текст никуда не уходит
+    let ut = userText;
+    if (ut == null) { const i = msgs.indexOf(reply); const lu = msgs.slice(0, i < 0 ? msgs.length : i).reverse().find(m => m.role === 'user'); ut = lu ? lu.content : ''; }
+    const answer = reply.content.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim();
+    telemetry.logExchange({ chatId: state.chat.id, provider: p.id, model, slot, userText: slot === 'B' ? '' : ut, assistantText: answer, ts: reply.ts,
+      eventId: state.chat.id + '-' + slot + '-' + (reply.ts || Date.now()).toString(36) + '-' + msgs.length });
+  } catch { /* журнал никогда не должен мешать чату */ }
+}
+
+function paintPrivacy() {
+  const on = telemetry.available;
+  $('logGroup').hidden = !on; $('logChip').hidden = !on;
+  $('privacyHint').textContent = on
+    ? 'Запросы идут напрямую из вашего браузера к API провайдеров. Если вы согласились, тексты сообщений дополнительно сохраняются на сервере владельца сайта и могут быть прочитаны им (ключи, свой Base URL и системный промпт не отправляются). Бесплатные сервисы могут логировать запросы; AI Horde показывает промпты волонтёрам — не отправляйте личное.'
+    : 'Запросы идут напрямую из вашего браузера к API провайдеров. Бесплатные сервисы могут логировать запросы; AI Horde показывает промпты волонтёрам — не отправляйте личное.';
+  if (!on) return;
+  const c = telemetry.consent;
+  $('consentToggle').checked = c === 'yes';
+  $('consentState').textContent = c === 'yes' ? 'Сообщения сохраняются на сервере владельца.' : c === 'no' ? 'Ничего не отправляется на сервер владельца.' : 'Выбор ещё не сделан — ничего не отправляется.';
+  $('logChip').textContent = c === 'yes' ? '● на сервере' : '○ локально';
+  $('logChip').classList.toggle('on', c === 'yes');
+  $('logChip').title = c === 'yes' ? 'Сообщения сохраняются на сервере владельца сайта. Нажмите, чтобы изменить.' : 'Сообщения не отправляются на сервер владельца. Нажмите, чтобы изменить.';
+}
+function setConsent(v, { announceIt = true } = {}) {
+  telemetry.setConsent(v); paintPrivacy(); if (!slotMsgs('A').length) renderAll();
+  if (announceIt) toast(v ? 'Сообщения будут сохраняться на сервере владельца сайта' : 'Сохранение на сервере выключено. Чат работает как прежде.', { ms: 3500 });
+}
+function showConsentDialog() {
+  return new Promise(resolve => {
+    const d = document.createElement('dialog'); d.className = 'dialog consent'; d.id = 'consentDialog';
+    d.setAttribute('aria-labelledby', 'consentTitle'); d.setAttribute('aria-describedby', 'consentText');
+    d.innerHTML = `<form method="dialog"><h2 id="consentTitle">Сохранение сообщений</h2><div class="dialog-body"><p id="consentText">Сообщения в этом чате сохраняются на сервере владельца сайта для улучшения сервиса и могут быть прочитаны им. Не отправляйте пароли, персональные и другие чувствительные данные.</p><p class="muted small">Сообщения по-прежнему уходят и выбранному AI-провайдеру. Ключи, свой Base URL и системный промпт на сервер владельца не отправляются. Выбор можно изменить в «Настройки», а сохранённое — удалить кнопкой «Удалить мои данные с сервера».</p></div><div class="dialog-actions"><button class="btn" value="no" id="consentNo">Не сохранять</button><button class="btn primary" value="yes" id="consentYes" autofocus>Принимаю</button></div></form>`;
+    document.body.appendChild(d);
+    d.addEventListener('cancel', e => e.preventDefault());       // Esc не заменяет явный выбор
+    d.addEventListener('close', () => { const v = d.returnValue === 'yes'; d.remove(); resolve(v); });
+    if (typeof d.showModal === 'function') d.showModal(); else d.setAttribute('open', '');
+  });
+}
+async function askConsentIfNeeded() {
+  if (!telemetry.needsAsk) return;
+  const v = await showConsentDialog();
+  setConsent(v, { announceIt: false });
+  toast(v ? 'Принято. Изменить выбор можно в «Настройки».' : 'Хорошо, ничего не сохраняется. Чат работает как обычно.', { ms: 3500 });
+}
+function bindPrivacy() {
+  $('consentToggle').onchange = () => setConsent($('consentToggle').checked);
+  $('logChip').onclick = () => { if (isMobile()) openSidebar(true); else if (!sidebarIsOpen()) openSidebar(true); setTab('settings', true); setTimeout(() => $('consentToggle').focus(), 50); };
+  $('deleteMyDataBtn').onclick = async () => {
+    const ok = await confirmDialog({ title: 'Удалить мои данные с сервера?', html: '<p>Все сообщения, сохранённые на сервере владельца под этим браузером, будут удалены. Переписка в самом браузере останется.</p>', ok: 'Удалить', danger: true });
+    if (!ok) return;
+    const btn = $('deleteMyDataBtn'); btn.disabled = true;
+    const r = await telemetry.deleteMyData(); btn.disabled = false;
+    if (r.ok) toast(r.deleted ? `Удалено сообщений на сервере: ${r.deleted}` : 'На сервере ничего не найдено — данных нет.', { ms: 3500 });
+    else toast('Не удалось удалить: ' + r.error, { kind: 'err', ms: 4500 });
+  };
+}
 
 /* ============================== генерация ============================== */
 function busyUI() {
@@ -504,6 +569,7 @@ async function runSlot(slot, userText, { regenerate = false, images = null } = {
       paintMsg(refs, false);
     }
     busyUI(); persist();
+    if (!reply._gone) reportExchange(slot, userText, reply, p, model, msgs);
     if (ok || reply.content) announce(slot === 'A' ? 'Ответ получен' : 'Ответ второй модели получен');
     if (reply.error && slot === 'A') showBanner('');
   }
@@ -569,7 +635,7 @@ function renderChatList() {
   // поиск по названию и, если не нашли, по тексту сообщений (данные локальные, чатов немного)
   const inBody = r => { const c = chats.get(r.id); return !!c && [...c.msgs, ...(c.msgsB || [])].some(m => (m.content || '').toLowerCase().includes(q)); };
   const idx = chats.index().filter(r => !q || (r.title || '').toLowerCase().includes(q) || inBody(r));
-  $('chatListEmpty').hidden = idx.length > 0; $('chatListEmpty').textContent = q ? 'Ничего не найдено.' : 'Чатов пока нет. История хранится только в вашем браузере.';
+  $('chatListEmpty').hidden = idx.length > 0; $('chatListEmpty').textContent = q ? 'Ничего не найдено.' : telemetry.enabled ? 'Чатов пока нет. История хранится в вашем браузере (и на сервере владельца, раз вы согласились).' : 'Чатов пока нет. История хранится только в вашем браузере.';
   el.chatList.innerHTML = idx.map(r => `<li class="chat-item${r.id === state.chat.id ? ' cur' : ''}${r.pinned ? ' pinned' : ''}" data-id="${esc(r.id)}"><button type="button" class="chat-open" data-id="${esc(r.id)}"${r.id === state.chat.id ? ' aria-current="true"' : ''}><span class="ct-title">${r.pinned ? '📌 ' : ''}${esc(r.title || 'Без названия')}</span><small>${esc(pById(r.provider).short)} · ${r.n || 0} сообщ. · ${fmtAgo(r.updated)}</small></button><span class="chat-tools"><button type="button" data-a="pin" aria-label="${r.pinned ? 'Открепить' : 'Закрепить'}: ${esc(r.title)}" title="${r.pinned ? 'Открепить' : 'Закрепить'}">📌</button><button type="button" data-a="rename" aria-label="Переименовать: ${esc(r.title)}" title="Переименовать">✎</button><button type="button" data-a="del" aria-label="Удалить: ${esc(r.title)}" title="Удалить">🗑</button></span></li>`).join('');
 }
 async function openChat(id) {
@@ -779,7 +845,7 @@ async function init() {
   $('systemPrompt').value = S.system || ''; $('presetSel').value = ''; // заполняется в bind()
   $('temp').value = S.temp; $('tempOut').textContent = (+S.temp).toFixed(1); $('maxTokens').value = String(S.maxTokens || 0);
   $('customUrl').value = S.customUrl; $('customModel').value = S.customModel; $('proxyUrl').value = S.proxy || ''; setProxy(S.proxy);
-  bind();
+  bind(); bindPrivacy(); paintPrivacy();
   $('presetSel').value = SYSTEM_PRESETS.some(x => x.id === S.preset) || S.preset === '__custom' ? S.preset : '';
   initScroll('A'); initScroll('B');
   setTab(['chats', 'model', 'settings'].includes(S.tab) ? S.tab : 'model');
@@ -794,7 +860,8 @@ async function init() {
   renderAll();
   // фоновая прогрев-загрузка списков остальных бесключевых провайдеров (только GET списков, без чат-запросов)
   setTimeout(() => { for (const p of PROVIDERS.filter(x => x.group === 'keyless' && !x.noModelsEndpoint)) if (!state.lists[p.id]) loadList(p.id).then(() => renderSlotCard('A')); }, 1500);
-  window.__fah = { state, chats, PROVIDERS, send, loadList, runCheck, renderAll, selectProvider, ensureModel };    // для отладки и тестов
+  window.__fah = { state, chats, PROVIDERS, send, loadList, runCheck, renderAll, selectProvider, ensureModel, telemetry };    // для отладки и тестов
   document.documentElement.dataset.ready = '1';
+  askConsentIfNeeded();
 }
 init();

@@ -1,0 +1,17 @@
+# /etc/caddy/Caddyfile — HTTPS автоматически (Let's Encrypt). Замените домен.
+chat-log.example.com {
+	encode zstd gzip
+	# при желании ограничьте /admin по IP:
+	# @admin path /admin* /api/admin*
+	# @notmine not remote_ip 203.0.113.10
+	# respond @notmine 403
+	reverse_proxy 127.0.0.1:8080 {
+		# приложение берёт клиентский адрес из X-Forwarded-For (последняя запись, добавленная Caddy) при TRUST_PROXY=1
+		header_up X-Forwarded-Proto {scheme}
+	}
+	header -Server
+	log {
+		# IP-адреса в логах Caddy не нужны: не пишем access-лог с телом/адресами
+		output discard
+	}
+}

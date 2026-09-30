@@ -1,6 +1,6 @@
 /* Необязательный service worker: «сначала сеть, при её отсутствии — кэш». Нужен, чтобы приложение открывалось офлайн
  * (например, вместе с локальной моделью, уже скачанной в браузер). API-запросы к провайдерам он НЕ трогает и не кэширует. */
-const CACHE = 'fah-v2-shell-2.2';
+const CACHE = 'fah-v2-shell-2.4-log';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil((async () => {
   for (const k of await caches.keys()) if (k !== CACHE) await caches.delete(k);

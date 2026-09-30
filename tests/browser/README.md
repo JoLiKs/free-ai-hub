@@ -1,5 +1,7 @@
 # Браузерные проверки (необязательно)
 
+Новое: `consent-backend.cjs` (согласие + журнал на бэкенде; env SITE_ON, SITE_OFF, BACKEND, ADMIN_PW), `admin-xss.cjs` (XSS в админке; env BACKEND, ADMIN_PW), `shots-backend.cjs` (скриншоты) — нужен запущенный бэкенд (см. backend/README.md).
+
 Требуют Chrome/Chromium и `npm i puppeteer-core axe-core` (в этой папке). Приложение должно быть запущено (`python3 -m http.server 8138` в корне проекта).
 
 ```

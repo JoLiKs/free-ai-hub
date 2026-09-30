@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ru" data-theme="cyber">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="dark">
+  <title>Free AI Hub — админ-панель</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+<div id="app">
+  <!-- вход -->
+  <main id="loginView" class="login-wrap" hidden>
+    <form id="loginForm" class="card login" autocomplete="off">
+      <div class="brand"><span class="logo" aria-hidden="true">✦</span><div><h1 data-text="Free AI Hub">Free AI Hub</h1><p>админ-панель</p></div></div>
+      <label for="pw" class="lbl">Пароль администратора</label>
+      <input id="pw" name="password" type="password" class="field" autocomplete="current-password" required autofocus>
+      <p id="loginErr" class="err" role="alert" hidden></p>
+      <button class="btn primary wide" type="submit">Войти</button>
+      <p class="hint">Доступ только для владельца сайта. После нескольких неверных попыток вход временно блокируется.</p>
+    </form>
+  </main>
+
+  <!-- основной экран -->
+  <div id="mainView" class="shell" hidden>
+    <header class="top">
+      <div class="brand"><span class="logo" aria-hidden="true">✦</span><div><h1 data-text="Free AI Hub">Free AI Hub</h1><p>админ-панель</p></div></div>
+      <nav class="tabs" role="tablist" aria-label="Разделы">
+        <button role="tab" id="tab-sessions" data-tab="sessions" aria-selected="true" type="button">Сессии</button>
+        <button role="tab" id="tab-stats" data-tab="stats" aria-selected="false" type="button">Статистика</button>
+        <button role="tab" id="tab-settings" data-tab="settings" aria-selected="false" type="button">Настройки</button>
+      </nav>
+      <div class="spacer"></div>
+      <span id="pausedBadge" class="badge warn" hidden>запись приостановлена</span>
+      <button id="themeBtn" class="btn small" type="button" title="Сменить оформление">Тема: кибер</button>
+      <button id="logoutBtn" class="btn small" type="button">Выйти</button>
+    </header>
+
+    <!-- Сессии -->
+    <section id="view-sessions" class="view" role="tabpanel" aria-labelledby="tab-sessions">
+      <form id="filters" class="filters card" autocomplete="off">
+        <input id="fQ" class="field grow" type="search" placeholder="Поиск по тексту сообщений…" aria-label="Поиск по тексту">
+        <select id="fProv" class="field" aria-label="Провайдер"><option value="">Все провайдеры</option></select>
+        <select id="fModel" class="field" aria-label="Модель"><option value="">Все модели</option></select>
+        <label class="dt"><span>С</span><input id="fFrom" class="field" type="date" aria-label="Дата с"></label>
+        <label class="dt"><span>По</span><input id="fTo" class="field" type="date" aria-label="Дата по"></label>
+        <button class="btn primary" type="submit">Найти</button>
+        <button class="btn" type="button" id="fReset">Сбросить</button>
+      </form>
+      <div class="split">
+        <aside class="card list-card">
+          <div class="list-head"><span id="listInfo" class="muted small">—</span>
+            <span class="row"><button id="expJson" class="btn small" type="button">JSON</button><button id="expCsv" class="btn small" type="button">CSV</button></span></div>
+          <ul id="sessionList" class="slist" aria-label="Сессии"></ul>
+          <div class="row pager"><button id="prevPage" class="btn small" type="button">← Назад</button><span id="pageInfo" class="muted small"></span><button id="nextPage" class="btn small" type="button">Дальше →</button></div>
+        </aside>
+        <article class="card conv" id="conv" aria-live="polite">
+          <div class="empty" id="convEmpty"><div class="empty-ico" aria-hidden="true">⌁</div><p>Выберите сессию слева, чтобы прочитать переписку.</p></div>
+          <div id="convBody" hidden>
+            <div class="conv-head">
+              <div><h2 id="convTitle">Сессия</h2><div id="convMeta" class="meta"></div></div>
+              <div class="row"><button id="convJson" class="btn small" type="button">JSON</button><button id="convCsv" class="btn small" type="button">CSV</button><button id="convDel" class="btn small danger" type="button">Удалить сессию</button></div>
+            </div>
+            <div id="msgs" class="msgs"></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- Статистика -->
+    <section id="view-stats" class="view" role="tabpanel" aria-labelledby="tab-stats" hidden>
+      <div class="row wrap between">
+        <h2 class="h2">Статистика</h2>
+        <label class="row small">Период: <select id="statDays" class="field"><option value="7">7 дней</option><option value="30" selected>30 дней</option><option value="90">90 дней</option><option value="365">год</option></select></label>
+      </div>
+      <div id="kpis" class="kpis"></div>
+      <div class="grid2">
+        <div class="card"><h3>Сообщения по дням</h3><div id="chartDays" class="bars" role="img" aria-label="График сообщений по дням"></div><div class="legend"><span><i class="sw u"></i>вопросы</span><span><i class="sw a"></i>ответы</span></div></div>
+        <div class="card"><h3>Провайдеры</h3><div id="topProv" class="hbars"></div></div>
+        <div class="card"><h3>Модели</h3><div id="topModels" class="hbars"></div></div>
+        <div class="card"><h3>Страны (по сессиям)</h3><div id="topCountries" class="hbars"></div></div>
+      </div>
+    </section>
+
+    <!-- Настройки -->
+    <section id="view-settings" class="view" role="tabpanel" aria-labelledby="tab-settings" hidden>
+      <h2 class="h2">Настройки и данные</h2>
+      <div class="grid2">
+        <div class="card">
+          <h3>Запись сообщений</h3>
+          <label class="switch"><input id="pauseToggle" type="checkbox"><span class="sw"></span><span>Приостановить запись (сайт продолжит работать, новые сообщения не сохраняются)</span></label>
+          <p id="setInfo" class="muted small"></p>
+        </div>
+        <div class="card">
+          <h3>Хранение</h3>
+          <p id="retInfo" class="muted"></p>
+          <button id="cleanupBtn" class="btn" type="button">Запустить очистку сейчас</button>
+        </div>
+        <div class="card">
+          <h3>Экспорт</h3>
+          <p class="muted small">Все сообщения (с учётом фильтров на вкладке «Сессии» не применяются).</p>
+          <div class="row"><button id="expAllJson" class="btn" type="button">Всё в JSON</button><button id="expAllCsv" class="btn" type="button">Всё в CSV</button></div>
+        </div>
+        <div class="card danger-zone">
+          <h3>Опасная зона</h3>
+          <p class="muted small">Безвозвратно удаляет все сессии и сообщения.</p>
+          <button id="purgeBtn" class="btn danger" type="button">Удалить всё</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+  <dialog id="dlg" class="dialog"><form method="dialog"><h2 id="dlgTitle"></h2><p id="dlgText"></p><div id="dlgInputWrap" hidden><input id="dlgInput" class="field" autocomplete="off"></div><div class="row end"><button class="btn" value="cancel">Отмена</button><button id="dlgOk" class="btn danger" value="ok">Удалить</button></div></form></dialog>
+</div>
+<script src="/admin/app.js" defer></script>
+</body>
+</html>

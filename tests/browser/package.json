@@ -1,0 +1,1 @@
+{ "name": "free-ai-hub-browser-tests", "private": true, "description": "Браузерные проверки (headless Chrome). npm i puppeteer-core axe-core; CHROME=/path/to/chrome APP_URL=http://127.0.0.1:8138/index.html node xss.cjs", "dependencies": { "puppeteer-core": "*", "axe-core": "*" } }

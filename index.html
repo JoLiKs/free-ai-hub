@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0a0d14">
+  <title>Free AI Hub — бесплатные нейросети без ключей</title>
+  <meta name="description" content="Чат с бесплатными AI API прямо в браузере. Без регистрации и ключей. Сравнение моделей, история чатов, модели в браузере.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%237c6cff'/%3E%3Cstop offset='1' stop-color='%2322d3ee'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23g)'/%3E%3Cpath d='M32 12l4.6 12.4L49 29l-12.4 4.6L32 46l-4.6-12.4L15 29l12.4-4.6z' fill='white'/%3E%3C/svg%3E">
+  <script>
+    /* тема до первой отрисовки (без вспышки) */
+    try { var t = JSON.parse(localStorage.getItem('fah.settings') || '{}').theme || 'auto';
+      var d = t === 'auto' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : t;
+      document.documentElement.dataset.theme = d; document.documentElement.dataset.themePref = t;
+      var m = document.querySelector('meta[name=theme-color]'); if (m) m.content = d === 'light' ? '#f5f6fa' : '#0a0d14'; } catch (e) {}
+  </script>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#input">Перейти к вводу сообщения</a>
+<div class="app" id="app">
+
+  <!-- ============ Боковая панель ============ -->
+  <aside class="sidebar" id="sidebar" aria-label="Панель управления">
+    <div class="sb-head">
+      <div class="brand">
+        <span class="logo" aria-hidden="true"><svg viewBox="0 0 64 64" width="26" height="26"><path d="M32 10l5.2 14L51 29.2 37.2 34.4 32 48.4l-5.2-14L13 29.2 26.8 24z" fill="currentColor"/><path d="M50 8l1.8 4.6L56.4 14l-4.6 1.8L50 20.4l-1.8-4.6L43.6 14l4.6-1.4z" fill="currentColor" opacity=".7"/></svg></span>
+        <div class="brand-text"><h1>Free AI Hub</h1><p>бесплатные нейросети без ключей</p></div>
+      </div>
+      <button class="icon-btn only-mobile" id="closeSidebar" type="button" aria-label="Закрыть панель"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+
+    <button class="btn primary wide" id="newChatBtn" type="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Новый чат <kbd>Alt N</kbd></button>
+
+    <div class="tabs" role="tablist" aria-label="Разделы панели">
+      <button role="tab" id="tab-chats" aria-controls="pane-chats" aria-selected="false" data-tab="chats" type="button">Чаты</button>
+      <button role="tab" id="tab-model" aria-controls="pane-model" aria-selected="true" data-tab="model" type="button">Модель</button>
+      <button role="tab" id="tab-settings" aria-controls="pane-settings" aria-selected="false" data-tab="settings" type="button">Настройки</button>
+    </div>
+
+    <div class="sb-body">
+      <!-- ---- Чаты ---- -->
+      <section class="pane" id="pane-chats" role="tabpanel" aria-labelledby="tab-chats" hidden>
+        <input type="search" id="chatSearch" class="field" placeholder="Поиск по чатам и тексту…" aria-label="Поиск по чатам и их тексту" autocomplete="off">
+        <ul class="chat-list" id="chatList" aria-label="История чатов"></ul>
+        <p class="muted small" id="chatListEmpty" hidden>Чатов пока нет. История хранится только в вашем браузере.</p>
+        <div class="row gap wrap top-gap">
+          <button class="btn small" id="exportAllBtn" type="button">Экспорт JSON</button>
+          <button class="btn small" id="importBtn" type="button">Импорт</button>
+          <button class="btn small ghost danger-text" id="deleteAllBtn" type="button">Удалить всё</button>
+          <input type="file" id="importFile" accept="application/json,.json" hidden>
+        </div>
+      </section>
+
+      <!-- ---- Модель ---- -->
+      <section class="pane" id="pane-model" role="tabpanel" aria-labelledby="tab-model">
+        <div class="slot" id="slotA">
+          <div class="slot-title"><span class="slot-tag" id="tagA" hidden>А</span><span class="lbl">Модель</span></div>
+          <button class="picker" id="provBtnA" type="button" aria-haspopup="dialog" aria-expanded="false"></button>
+          <div class="prov-info" id="provInfoA"></div>
+          <button class="picker model-picker" id="modelBtnA" type="button" aria-haspopup="dialog" aria-expanded="false"></button>
+          <div class="row between gap top-gap">
+            <button class="btn small" id="checkBtnA" type="button" title="Проверить, отвечают ли модели провайдера прямо сейчас">✓ Проверить доступность</button>
+            <span class="muted small" id="healthSumA" aria-live="polite"></span>
+          </div>
+          <div class="progress" id="checkProgA" hidden><div class="bar"></div></div>
+          <details class="keybox" id="keyBoxA">
+            <summary><span>🔑 Свой ключ</span> <em>(необязательно)</em></summary>
+            <div class="custom-only" id="customFields">
+              <label class="lbl" for="customUrl">Base URL (OpenAI-совместимый)</label>
+              <input type="url" id="customUrl" class="field" placeholder="https://api.example.com/v1" autocomplete="off">
+              <label class="lbl" for="customModel">ID модели (если список не грузится)</label>
+              <input type="text" id="customModel" class="field" placeholder="например, gpt-4o-mini" autocomplete="off">
+            </div>
+            <label class="lbl" for="keyInput">API-ключ</label>
+            <input type="password" id="keyInput" class="field" placeholder="вставьте ключ" autocomplete="off" spellcheck="false">
+            <p class="hint">Ключ хранится <b>только в localStorage вашего браузера</b> и отправляется исключительно выбранному провайдеру.</p>
+            <div class="row gap wrap"><a id="keyLink" href="#" target="_blank" rel="noopener noreferrer">Где взять ключ ↗</a>
+              <button class="btn small ghost" id="clearKey" type="button">Удалить ключ</button></div>
+          </details>
+        </div>
+
+        <label class="switch top-gap"><input type="checkbox" id="compareToggle"><span class="sw"></span><span>Режим сравнения <small>(две модели рядом)</small></span></label>
+
+        <div class="slot" id="slotB" hidden>
+          <div class="slot-title"><span class="slot-tag b">Б</span><span class="lbl">Вторая модель</span></div>
+          <button class="picker" id="provBtnB" type="button" aria-haspopup="dialog" aria-expanded="false"></button>
+          <div class="prov-info" id="provInfoB"></div>
+          <button class="picker model-picker" id="modelBtnB" type="button" aria-haspopup="dialog" aria-expanded="false"></button>
+          <p class="hint" id="keyNoteB" hidden>Ключ для этого провайдера вводится в блоке «Свой ключ» (выберите его в слоте А, вставьте ключ, потом верните).</p>
+        </div>
+
+        <label class="switch top-gap"><input type="checkbox" id="autoFallback"><span class="sw"></span><span>Автовыбор рабочей модели <small>(при сбое — пробовать другую)</small></span></label>
+      </section>
+
+      <!-- ---- Настройки ---- -->
+      <section class="pane" id="pane-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
+        <div class="group">
+          <label class="lbl" for="presetSel">Системный промпт</label>
+          <select id="presetSel" class="field"></select>
+          <textarea id="systemPrompt" class="field" rows="3" placeholder="Например: Отвечай кратко и по-русски." aria-label="Текст системного промпта"></textarea>
+        </div>
+        <div class="group">
+          <div class="row between"><label class="lbl" for="temp">Температура</label><output id="tempOut" for="temp">0.7</output></div>
+          <input type="range" id="temp" min="0" max="2" step="0.1" value="0.7">
+          <div class="row between top-gap-s"><label class="lbl" for="maxTokens">Макс. токенов ответа</label></div>
+          <select id="maxTokens" class="field">
+            <option value="0">авто (по умолчанию провайдера)</option><option value="256">256</option><option value="512">512</option>
+            <option value="1024">1024</option><option value="2048">2048</option><option value="4096">4096</option><option value="8192">8192</option>
+          </select>
+        </div>
+        <div class="group">
+          <label class="lbl" for="themeSel">Тема оформления</label>
+          <select id="themeSel" class="field"><option value="auto">Как в системе</option><option value="dark">Тёмная</option><option value="light">Светлая</option></select>
+        </div>
+        <div class="group">
+          <label class="lbl" for="proxyUrl">CORS-прокси (необязательно)</label>
+          <input type="url" id="proxyUrl" class="field" placeholder="https://free-ai-hub-proxy.you.workers.dev" autocomplete="off" spellcheck="false">
+          <p class="hint">Нужен только для провайдера «Kilo Gateway» (у него нет CORS). Свой воркер: файл <code>proxy/worker.js</code>, разворачивается на Cloudflare Workers бесплатно. Остальное работает без него.</p>
+        </div>
+        <div class="group">
+          <span class="lbl">Проверка сервисов</span>
+          <button class="btn wide" id="checkAllBtn" type="button">✓ Проверить все провайдеры без ключа</button>
+          <p class="hint" id="checkAllInfo">Отправляет каждой бесключевой модели крошечный запрос и запоминает результат на 6 часов. Учитываются лимиты сервисов.</p>
+          <div class="progress" id="checkProgAll" hidden><div class="bar"></div></div>
+          <button class="btn small ghost" id="clearCacheBtn" type="button">Сбросить кэш моделей и проверок</button>
+        </div>
+        <div class="group">
+          <span class="lbl">Горячие клавиши</span>
+          <dl class="keys">
+            <dt><kbd>Enter</kbd></dt><dd>отправить</dd>
+            <dt><kbd>Shift</kbd>+<kbd>Enter</kbd></dt><dd>новая строка</dd>
+            <dt><kbd>Esc</kbd></dt><dd>остановить ответ / закрыть окно</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>K</kbd></dt><dd>выбор модели</dd>
+            <dt><kbd>Alt</kbd>+<kbd>N</kbd></dt><dd>новый чат</dd>
+            <dt><kbd>/</kbd></dt><dd>перейти к вводу</dd>
+            <dt><kbd>Alt</kbd>+<kbd>B</kbd></dt><dd>показать/скрыть панель</dd>
+            <dt><kbd>↑</kbd> в пустом поле</dt><dd>изменить последнее сообщение</dd>
+          </dl>
+        </div>
+        <p class="hint">Запросы идут напрямую из вашего браузера к API провайдеров. Бесплатные сервисы могут логировать запросы; AI Horde показывает промпты волонтёрам — не отправляйте личное.</p>
+      </section>
+    </div>
+  </aside>
+
+  <!-- ============ Основная область ============ -->
+  <main class="main" id="main">
+    <header class="topbar">
+      <button class="icon-btn" id="openSidebar" type="button" aria-label="Открыть панель" aria-controls="sidebar"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>
+      <button class="cur" id="curLabel" type="button" aria-haspopup="dialog" title="Выбрать модель (Ctrl+K)"></button>
+      <div class="spacer"></div>
+      <div class="menu-wrap">
+        <button class="icon-btn" id="exportBtn" type="button" aria-label="Экспорт чата" aria-haspopup="menu" aria-expanded="false" title="Экспорт чата"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg></button>
+        <div class="menu" id="exportMenu" role="menu" hidden>
+          <button role="menuitem" type="button" data-export="md">Скачать как Markdown</button>
+          <button role="menuitem" type="button" data-export="json">Скачать как JSON</button>
+          <button role="menuitem" type="button" data-export="copy">Копировать Markdown</button>
+        </div>
+      </div>
+      <button class="icon-btn" id="themeBtn" type="button" aria-label="Сменить тему" title="Тема: авто / тёмная / светлая"></button>
+      <button class="icon-btn" id="clearBtn" type="button" aria-label="Очистить чат" title="Очистить чат"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
+    </header>
+
+    <div class="banner" id="banner" role="status" hidden></div>
+
+    <h2 class="sr-only">Диалог</h2>
+    <div class="panels" id="panels">
+      <section class="panel" id="panelA" aria-label="Диалог">
+        <div class="panel-head" id="headA" hidden></div>
+        <div class="messages" id="msgsA" role="log" aria-live="off" aria-label="Сообщения" tabindex="0"></div>
+      </section>
+      <section class="panel" id="panelB" aria-label="Диалог второй модели" hidden>
+        <div class="panel-head" id="headB"></div>
+        <div class="messages" id="msgsB" role="log" aria-live="off" aria-label="Сообщения второй модели" tabindex="0"></div>
+      </section>
+    </div>
+
+    <form class="composer" id="composer" autocomplete="off">
+      <div class="composer-card">
+        <div class="attach-strip" id="attachStrip" hidden aria-label="Прикреплённые изображения"></div>
+        <textarea id="input" rows="2" placeholder="Напишите сообщение…" aria-label="Сообщение" enterkeyhint="send"></textarea>
+        <div class="composer-bar">
+          <button type="button" class="attach-btn" id="attachBtn" hidden aria-label="Прикрепить изображение" title="Прикрепить изображение (модель с поддержкой картинок)">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l7.9-7.9"/></svg>
+          </button>
+          <input type="file" id="attachFile" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
+          <span class="composer-hint" id="composerHint"></span>
+          <span class="est" id="est" aria-hidden="true"></span>
+          <button type="submit" class="send-btn" id="sendBtn" aria-label="Отправить" title="Отправить (Enter)">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
+          </button>
+          <button type="button" class="send-btn stop" id="stopBtn" hidden aria-label="Остановить" title="Остановить (Esc)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>
+          </button>
+        </div>
+      </div>
+    </form>
+  </main>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<div class="popover" id="popover" role="dialog" aria-modal="false" hidden></div>
+<div class="toasts" id="toasts" aria-live="polite" aria-atomic="true"></div>
+<div class="sr-only" id="live" aria-live="polite" aria-atomic="true"></div>
+<script type="module" src="js/app.js"></script>
+<script>
+  /* если модули не загрузились (например, открыт через file://) — объясняем, что делать */
+  setTimeout(function () {
+    if (document.documentElement.dataset.ready === '1') return;
+    var d = document.createElement('div');
+    d.setAttribute('role', 'alert');
+    d.style.cssText = 'position:fixed;inset:auto 16px 16px 16px;z-index:99;padding:14px 16px;border-radius:12px;background:#3b1219;color:#ffd9de;font:14px/1.5 system-ui,sans-serif;border:1px solid #7a2a35';
+    d.innerHTML = location.protocol === 'file:'
+      ? '<b>Страница открыта как файл (file://).</b> Браузеры блокируют ES-модули в таком режиме. Запустите в папке проекта <code>python3 -m http.server 8138</code> и откройте <code>http://127.0.0.1:8138</code>.'
+      : '<b>Не удалось загрузить приложение.</b> Обновите страницу (Ctrl+F5); если не помогает — проверьте, что открыты все файлы из папки <code>js/</code>, и что браузер современный (ES-модули).';
+    document.body.appendChild(d);
+  }, 2500);
+</script>
+<script>
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === '127.0.0.1' || location.hostname === 'localhost')) addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+</script>
+<noscript><p style="padding:24px;font-family:sans-serif">Для работы Free AI Hub нужен JavaScript.</p></noscript>
+</body>
+</html>

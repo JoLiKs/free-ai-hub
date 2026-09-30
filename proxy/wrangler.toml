@@ -1,0 +1,7 @@
+# Деплой: npm i -g wrangler && wrangler login && wrangler deploy   (в папке proxy/)
+name = "free-ai-hub-proxy"
+main = "worker.js"
+compatibility_date = "2026-09-01"
+
+# [vars]
+# ALLOWED_ORIGINS = "https://your-site.example"   # необязательно: ограничить сайты, которым можно пользоваться прокси

@@ -1,0 +1,13 @@
+const {launch,open,sleep}=require('./lib.cjs');
+(async()=>{const b=await launch(); const ctx=await b.createBrowserContext(); const p=await open(ctx,{});
+ const evil=`<img src=x onerror="window.__pwn=1"> <script>window.__pwn=2</script>\n\n[click](javascript:window.__pwn=3) [ok](https://example.com "t\\" onmouseover=\\"window.__pwn=4")\n\n\`\`\`html\n<script>window.__pwn=5</script>\n\`\`\`\n\n| a<img src=x onerror=window.__pwn=6> | b |\n|--|--|\n| <svg onload=window.__pwn=7> | [x](data:text/html,<script>1</script>) |\n\n<think><img src=x onerror=window.__pwn=8></think>\n\n![i](https://evil.example/x.png)\n\nhttps://example.com/a_b_c?x=1&y=<b>`;
+ await p.setRequestInterception(true);
+ p.on('request',r=>{ if(r.method()==='POST'&&/chat\/completions/.test(r.url())) return r.respond({status:200,headers:{'access-control-allow-origin':'*','content-type':'text/event-stream'},body:'data: '+JSON.stringify({choices:[{delta:{content:evil,reasoning:'<img src=x onerror=window.__pwn=9>'}}]})+'\n\ndata: [DONE]\n\n'}); r.continue(); });
+ await p.type('#input','<img src=x onerror=window.__pwn=10> привет'); await p.click('#sendBtn'); await sleep(1500);
+ await p.evaluate(()=>{const d=document.querySelector('.think'); if(d) d.open=true;});
+ console.log('pwn:',await p.evaluate(()=>window.__pwn));
+ console.log(await p.evaluate(()=>[...document.querySelectorAll('#msgsA a')].map(a=>a.outerHTML)));
+ console.log('imgs:',await p.evaluate(()=>[...document.querySelectorAll('#msgsA img')].map(a=>a.outerHTML)));
+ console.log('scripts in msgs:',await p.evaluate(()=>document.querySelectorAll('#msgsA script, #msgsA [onerror], #msgsA [onload], #msgsA [onmouseover]').length));
+ console.log(p.logs.join('\n')||'no logs');
+ await b.close();})();

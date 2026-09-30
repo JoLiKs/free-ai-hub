@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import { renderMarkdown, renderInline, splitThink } from '../js/markdown.js';
+import { estimateTokens } from '../js/util.js';
+let n = 0; const t = (name, fn) => { try { fn(); n++; console.log('  ✓', name); } catch (e) { console.error('  ✗', name, '\n   ', e.message); process.exitCode = 1; } };
+
+t('XSS: script в тексте экранируется', () => { const h = renderMarkdown('<script>alert(1)</script> <img src=x onerror=alert(1)>'); assert.ok(!/<script|<img/i.test(h)); });
+t('XSS: javascript: ссылки не превращаются в <a>', () => { const h = renderMarkdown('[x](javascript:alert(1)) [y](data:text/html;base64,AAA)'); assert.ok(!/<a /.test(h)); });
+t('XSS: кавычки в URL не ломают атрибут', () => { const h = renderMarkdown('[x](https://a.com/"onmouseover="alert(1))'); assert.ok(!/<a [^>]*"\s+onmouseover=/.test(h)); assert.ok(!/<[a-z][^>]*\sonmouseover=/i.test(h)); });
+t('ссылки: rel noopener', () => { assert.match(renderMarkdown('[a](https://example.com/?a=1&b=2)'), /rel="noopener noreferrer nofollow"/); assert.match(renderMarkdown('[a](https://example.com/?a=1&b=2)'), /href="https:\/\/example.com\/\?a=1&amp;b=2"/); });
+t('автоссылка', () => assert.match(renderMarkdown('см. https://example.com/x.'), /<a href="https:\/\/example.com\/x"[^>]*>https:\/\/example.com\/x<\/a>\./));
+t('жирный/курсив/код/зачёркнутый', () => { const h = renderInline('**b** *i* `c<d>` ~~s~~'); assert.match(h, /<strong>b<\/strong>/); assert.match(h, /<em>i<\/em>/); assert.match(h, /<code>c&lt;d&gt;<\/code>/); assert.match(h, /<del>s<\/del>/); });
+t('код внутри не форматируется', () => assert.ok(!/<em>|<strong>/.test(renderInline('`*a* **b**`'))));
+t('заголовки', () => assert.match(renderMarkdown('# A\n## B'), /<h2>A<\/h2><h3>B<\/h3>/));
+t('списки ul/ol', () => { const h = renderMarkdown('- a\n- b\n\n1. x\n2. y'); assert.match(h, /<ul><li>a<\/li><li>b<\/li><\/ul>/); assert.match(h, /<ol><li>x<\/li><li>y<\/li><\/ol>/); });
+t('вложенные списки', () => { const h = renderMarkdown('- a\n  - b\n  - c\n- d'); assert.match(h, /<ul><li>a<ul><li>b<\/li><li>c<\/li><\/ul><\/li><li>d<\/li><\/ul>/); });
+t('ol start', () => assert.match(renderMarkdown('3. a\n4. b'), /<ol start="3">/));
+t('таблица', () => { const h = renderMarkdown('| A | B |\n|---|:-:|\n| 1 | 2 |\n| 3 | <b>4</b> |'); assert.match(h, /<table>/); assert.match(h, /<th style="text-align:center">B<\/th>/); assert.match(h, /&lt;b&gt;4&lt;\/b&gt;/); });
+t('цитата', () => assert.match(renderMarkdown('> a\n> b'), /<blockquote><p>a<br>b<\/p><\/blockquote>/));
+t('hr', () => assert.match(renderMarkdown('a\n\n---\n\nb'), /<hr>/));
+t('блок кода: язык, кнопка, экранирование, подсветка', () => { const h = renderMarkdown('```js\nconst a = "<x>"; // hi\n```'); assert.match(h, /class="lang">js</); assert.match(h, /data-copy-code/); assert.match(h, /tk-k">const</); assert.match(h, /tk-s">&quot;&lt;x&gt;&quot;</); assert.match(h, /tk-c">\/\/ hi</); });
+t('незакрытый блок кода при стриминге', () => { const h = renderMarkdown('текст\n```python\ndef f():\n  return 1'); assert.match(h, /<pre/); assert.match(h, /tk-k">def</); });
+t('несколько блоков кода', () => assert.equal((renderMarkdown('```a\n1\n```\nx\n```b\n2\n```').match(/<pre/g) || []).length, 2));
+t('HTML внутри кода экранируется', () => assert.ok(!/<script/.test(renderMarkdown('```html\n<script>alert(1)</script>\n```'))));
+t('splitThink', () => { assert.deepEqual(splitThink('<think>a</think>b'), { thinking: 'a', answer: 'b', open: false }); assert.equal(splitThink('<think>abc').open, true); assert.equal(splitThink('hi').thinking, ''); });
+t('экранирование обратным слэшем и служебные символы', () => {
+  assert.equal(renderMarkdown('\\*не курсив\\* и \\_ и \\`код\\`'), '<p>*не курсив* и _ и `код`</p>');
+  assert.ok(!renderMarkdown('a\u0003b \\* \u00030\u0003').includes('\u0003'));
+  assert.ok(renderMarkdown('| a | b |\n|--|--|\n| x \\| y | z |').includes('x | y'));
+});
+t('estimateTokens', () => { assert.equal(estimateTokens(''), 0); assert.ok(estimateTokens('hello world') >= 2); assert.ok(estimateTokens('привет мир') >= estimateTokens('hello wor')); });
+t('нулевой символ в тексте не ломает плейсхолдеры', () => assert.ok(!/\u0000/.test(renderInline('a\u00000\u0000 `x`'))));
+t('глубокая вложенность цитат не роняет рендер', () => { assert.doesNotThrow(() => renderMarkdown('> '.repeat(5000) + 'x')); });
+t('экранированный | в таблице', () => assert.match(renderMarkdown('| a | b \\| c |\n|--|--|\n| 1 | 2 |'), /<th>b \| c<\/th>/));
+console.log(`markdown tests: ${n} passed`);

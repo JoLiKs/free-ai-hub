@@ -1,0 +1,14 @@
+{
+  "name": "Free AI Hub",
+  "short_name": "Free AI Hub",
+  "description": "Чат с бесплатными нейросетями прямо в браузере, без ключей",
+  "lang": "ru",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0a0d14",
+  "theme_color": "#0a0d14",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

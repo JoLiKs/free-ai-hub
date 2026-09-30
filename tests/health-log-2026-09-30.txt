@@ -1,0 +1,6 @@
+20260930-0139.json ovh 12/12 | chat 1/1 | llm7 4/4 | horde 22/23 | pollinations 1/1 => total 40
+20260930-0209.json ovh 12/12 | chat 1/1 | llm7 3/4 | horde 22/23 | pollinations 1/1 => total 39
+20260930-0241.json ovh 12/12 | chat 1/1 | llm7 4/4 | horde 20/23 | pollinations 1/1 => total 38
+20260930-0311.json ovh 12/12 | chat 1/1 | llm7 3/4 | horde 20/22 | pollinations 1/1 => total 37
+20260930-0342.json ovh 12/12 | chat 1/1 | llm7 3/4 | horde 20/22 | pollinations 1/1 => total 37
+final-0354  ovh 12/12 | chat 1/1 | llm7 3/4 | horde 21/23 | pollinations 1/1 => total 38

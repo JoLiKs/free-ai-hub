@@ -34,7 +34,7 @@ def test_api_rate_limit_per_ip(make_client):
 
 
 def test_rate_limit_per_ip_separate_when_proxied(make_client):
-    c = make_client(RATE_LIMIT_PER_MIN=2, TRUST_PROXY="1")
+    c = make_client(RATE_LIMIT_PER_MIN=2, TRUST_PROXY="1", TRUST_CF_IP="1")
     h = lambda ip: {"CF-Connecting-IP": ip}
     assert [post_log(c, event(), headers=h("1.1.1.1")).status_code for _ in range(3)] == [200, 200, 429]
     assert post_log(c, event(), headers=h("2.2.2.2")).status_code == 200
@@ -69,3 +69,10 @@ def test_global_login_guard():
     for i in range(3):
         g.fail(f"ip{i}")
     assert g.locked_for("someone-else") > 0
+
+
+def test_spoofed_cf_ip_ignored_behind_nginx(make_client):
+    """За nginx напрямую (не через Cloudflare) CF-Connecting-IP подделывается клиентом — по умолчанию игнорируется."""
+    c = make_client(RATE_LIMIT_PER_MIN=2, TRUST_PROXY="1")
+    codes = [post_log(c, event(), headers={"CF-Connecting-IP": f"3.3.3.{i}", "X-Forwarded-For": "4.4.4.4"}).status_code for i in range(3)]
+    assert codes == [200, 200, 429]

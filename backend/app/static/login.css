@@ -1,0 +1,74 @@
+/* Free AI Hub — админ-панель. Без внешних шрифтов/CDN. Тема «кибер» (по умолчанию) и «тёмная» (как на сайте). */
+:root{
+  --bg:#0a0d14;--surface:#141926;--surface2:#1a2030;--surface3:#212839;--line:#252d40;--line2:#323c55;
+  --text:#e8ebf4;--text2:#b6bdd0;--muted:#8891a8;--accent:#7c6cff;--accent2:#22d3ee;
+  --ok:#34d399;--warn:#fbbf24;--err:#f87171;--user:#7c6cff;--asst:#22d3ee;
+  --glow:radial-gradient(900px 520px at 85% -12%,#241f55 0%,transparent 62%),radial-gradient(700px 480px at -5% 105%,#0c2b3a 0%,transparent 60%);
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:Inter,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue","Noto Sans",Arial,sans-serif;
+  --disp:var(--sans);--cut:none;--r:14px;color-scheme:dark;
+}
+:root[data-theme=cyber]{
+  --bg:#07040f;--surface:#100a22;--surface2:#170e30;--surface3:#1f1440;--line:#3a2a6b;--line2:#5a3fa0;
+  --text:#f2ecff;--text2:#cfc3f5;--muted:#a597d1;--accent:#ff2bd6;--accent2:#00f0ff;
+  --ok:#39ff9a;--warn:#fcee0a;--err:#ff5577;--user:#ff2bd6;--asst:#00f0ff;
+  --glow:radial-gradient(900px 520px at 85% -12%,#3a0d57 0%,transparent 62%),radial-gradient(700px 480px at -5% 105%,#06303f 0%,transparent 60%);
+  --disp:"Orbitron","Rajdhani","Bahnschrift","DIN Alternate","Eurostile","Agency FB","Share Tech Mono","Cascadia Mono",ui-monospace,"SF Mono",Menlo,Consolas,"DejaVu Sans Mono",monospace;
+  --r:0px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--glow),var(--bg);background-attachment:fixed;color:var(--text);font:14.5px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
+[data-theme=cyber] body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.5;
+  background:linear-gradient(#ff2bd60d 1px,transparent 1px) 0 0/100% 44px,linear-gradient(90deg,#00f0ff0a 1px,transparent 1px) 0 0/44px 100%}
+[data-theme=cyber] body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;background:repeating-linear-gradient(0deg,#0000 0 2px,#0000000f 2px 3px)}
+#app{position:relative;z-index:1}
+[hidden]{display:none!important}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus{outline:none}:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+h1,h2,h3{margin:0;font-family:var(--disp)}
+h3{font-size:14px;margin-bottom:10px;color:var(--text2);letter-spacing:.02em}
+.h2{font-size:20px;margin:6px 0 14px}
+[data-theme=cyber] h2,[data-theme=cyber] h3{text-transform:uppercase;letter-spacing:.08em}
+[data-theme=cyber] h3{color:var(--accent2);text-shadow:0 0 8px #00f0ff55}
+.muted{color:var(--muted)}.small{font-size:12.5px}.grow{flex:1 1 220px;min-width:0}
+.row{display:flex;gap:8px;align-items:center}.wrap{flex-wrap:wrap}.between{justify-content:space-between}.end{justify-content:flex-end}.spacer{flex:1}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;position:relative}
+[data-theme=cyber] .card,[data-theme=cyber] .btn,[data-theme=cyber] .field,[data-theme=cyber] .dialog,[data-theme=cyber] .toast{
+  clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px));}
+[data-theme=cyber] .card{background:linear-gradient(160deg,#130b28,#0c0719);box-shadow:inset 0 0 22px -12px var(--accent)}
+[data-theme=cyber] .btn,[data-theme=cyber] .field{clip-path:polygon(0 0,calc(100% - 7px) 0,100% 7px,100% 100%,7px 100%,0 calc(100% - 7px))}
+.brand{display:flex;gap:10px;align-items:center}
+.brand h1{font-size:18px;line-height:1.1;position:relative}
+.brand p{margin:0;font-size:11.5px;color:var(--muted)}
+[data-theme=cyber] .brand h1{text-transform:uppercase;letter-spacing:.1em;text-shadow:0 0 10px var(--accent),0 0 2px #fff}
+[data-theme=cyber] .brand p{color:var(--accent);font-family:var(--mono);text-shadow:0 0 8px #ff2bd655}
+.logo{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:18px}
+[data-theme=cyber] .logo{border-radius:0;color:#07040f;clip-path:polygon(25% 3%,75% 3%,98% 50%,75% 97%,25% 97%,2% 50%)}
+.btn{background:var(--surface2);border:1px solid var(--line2);border-radius:10px;padding:8px 14px;line-height:1.2;transition:filter .15s,box-shadow .15s}
+.btn:hover{filter:brightness(1.18)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.small{padding:5px 10px;font-size:12.5px}
+.btn.wide{width:100%}
+.btn.primary{background:linear-gradient(135deg,#6a5cf5,#4f7df3);border-color:transparent;color:#fff}
+[data-theme=cyber] .btn{border-radius:0;background:linear-gradient(180deg,#1b1038,#120a26);color:#efeaff;font-family:var(--disp);text-transform:uppercase;letter-spacing:.06em;font-size:12.5px}
+[data-theme=cyber] .btn:hover{box-shadow:0 0 14px -2px var(--accent2)}
+[data-theme=cyber] .btn.primary{background:linear-gradient(135deg,var(--accent),#8a2bff);color:#fff;text-shadow:0 0 8px #0008}
+.btn.danger{background:#3b1219;border-color:#7a2a35;color:#ffd9de}
+[data-theme=cyber] .btn.danger{background:linear-gradient(180deg,#3a0e1e,#25081a);border-color:var(--err)}
+.field{background:var(--surface2);border:1px solid var(--line2);border-radius:10px;padding:8px 11px;min-width:0}
+[data-theme=cyber] .field{border-radius:0;background:#0b0618}
+.field:focus{border-color:var(--accent2);box-shadow:0 0 0 2px #00f0ff30}
+.lbl{display:block;margin:12px 0 6px;font-size:13px;color:var(--text2)}
+.err{color:var(--err);margin:8px 0}
+.hint{color:var(--muted);font-size:12px;margin:12px 0 0}
+.badge{display:inline-block;padding:2px 8px;border:1px solid var(--line2);border-radius:99px;font-size:11.5px;color:var(--text2)}
+.badge.warn{color:var(--warn);border-color:var(--warn)}
+[data-theme=cyber] .badge{border-radius:0}
+
+/* вход */
+.login-wrap{min-height:100vh;display:grid;place-items:center;padding:20px}
+.login{width:min(400px,100%);padding:26px}
+.login .brand{margin-bottom:10px}
+.login-wrap{position:relative;z-index:1}

@@ -64,28 +64,12 @@
   }
 
   /* ---------- вход / выход ---------- */
-  function showLogin(msg) {
-    $('mainView').hidden = true; $('loginView').hidden = false;
-    const e = $('loginErr'); e.hidden = !msg; e.textContent = msg || ''; $('pw').focus();
-  }
+  // Форма входа — отдельная публичная страница /admin/ (login.html). Эта панель доступна только с действующей сессией.
+  function showLogin() { location.replace('/admin/'); }
   async function showMain() {
-    $('loginView').hidden = true; $('mainView').hidden = false;
+    $('mainView').hidden = false;
     await loadFacets(); await loadSessions(); applyPaused();
   }
-  $('loginForm').addEventListener('submit', async ev => {
-    ev.preventDefault();
-    const btn = ev.submitter || $('loginForm').querySelector('button'); btn.disabled = true;
-    try {
-      const r = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ password: $('pw').value }) });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        let m = d.error || 'Ошибка входа';
-        if (r.status === 429) m += ' (повторите через ' + (r.headers.get('retry-after') || '?') + ' с)';
-        showLogin(m); return;
-      }
-      state.csrf = d.csrf; $('pw').value = ''; await boot();
-    } catch { showLogin('Нет связи с сервером'); } finally { btn.disabled = false; }
-  });
   $('logoutBtn').addEventListener('click', async () => { try { await api('/logout', { method: 'POST' }); } catch { /* */ } state.csrf = ''; showLogin(); });
 
   /* ---------- вкладки ---------- */
@@ -247,8 +231,8 @@
   async function boot() {
     try { applyTheme(localStorage.getItem('fah.admin.theme') === 'dark' ? 'dark' : 'cyber'); } catch { applyTheme('cyber'); }
     let me;
-    try { me = await (await fetch('/api/admin/me', { credentials: 'same-origin' })).json(); } catch { showLogin('Нет связи с сервером'); return; }
-    if (!me.authenticated) { showLogin(me.admin_enabled ? '' : 'Админ-панель отключена: на сервере не задан ADMIN_PASSWORD.'); return; }
+    try { me = await (await fetch('/api/admin/me', { credentials: 'same-origin' })).json(); } catch { toast('Нет связи с сервером', 'err'); return; }
+    if (!me.authenticated) { showLogin(); return; }
     state.csrf = me.csrf; state.paused = me.logging_paused; await showMain();
   }
   boot();

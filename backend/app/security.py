@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import ipaddress
 import json
 import os
 import re
@@ -105,11 +106,41 @@ class AdminAuth:
 
 
 # ---------------- IP ----------------
-def client_ip(headers, peer: str | None, trust_proxy: bool) -> str:
+PROXY_SECRET_HEADER = "x-fah-proxy-secret"
+PROXY_IP_HEADER = "x-fah-client-ip"
+
+
+def proxy_verified(headers, secret: str) -> bool:
+    """Запрос пришёл через наш Cloudflare-прокси (Pages Function): заголовок X-FAH-Proxy-Secret совпал с PROXY_SECRET."""
+    if not secret:
+        return False
+    got = headers.get(PROXY_SECRET_HEADER) or ""
+    return bool(got) and hmac.compare_digest(got.encode(), secret.encode())
+
+
+def _valid_ip(v: str) -> str | None:
+    try:
+        return str(ipaddress.ip_address(v.strip()))
+    except ValueError:
+        return None
+
+
+def client_ip(headers, peer: str | None, trust_proxy: bool, proxy_secret: str = "", trust_cf_ip: bool = False) -> str:
+    """Адрес клиента для лимитов/блокировок.
+
+    1. Запрос от нашего прокси (верный X-FAH-Proxy-Secret) -> X-FAH-Client-IP (= CF-Connecting-IP, выставляет Function).
+    2. CF-Connecting-IP верим ТОЛЬКО при TRUST_CF_IP=1 (бэкенд доступен исключительно через Cloudflare) — иначе его подделает любой.
+    3. TRUST_PROXY=1: последняя запись X-Forwarded-For / X-Real-IP (nginx её перезаписывает на $remote_addr).
+    """
+    if proxy_verified(headers, proxy_secret):
+        ip = _valid_ip(headers.get(PROXY_IP_HEADER) or "")
+        if ip:
+            return ip
     if trust_proxy:
-        cf = headers.get("cf-connecting-ip")
-        if cf:
-            return cf.strip()[:64]
+        if trust_cf_ip:
+            cf = headers.get("cf-connecting-ip")
+            if cf:
+                return cf.strip()[:64]
         xff = headers.get("x-forwarded-for")
         if xff:
             return xff.split(",")[-1].strip()[:64]   # запись, добавленная ближайшим прокси

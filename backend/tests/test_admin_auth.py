@@ -131,7 +131,7 @@ def test_successful_login_resets_failures(make_client):
 
 
 def test_lockout_is_per_ip(make_client):
-    c = make_client(LOGIN_MAX_FAILS=2, TRUST_PROXY="1")
+    c = make_client(LOGIN_MAX_FAILS=2, TRUST_PROXY="1", TRUST_CF_IP="1")
     for _ in range(2):
         c.post("/api/admin/login", json={"password": "bad"}, headers={"CF-Connecting-IP": "1.1.1.1"})
     assert c.post("/api/admin/login", json={"password": PASSWORD}, headers={"CF-Connecting-IP": "1.1.1.1"}).status_code == 429
@@ -166,8 +166,10 @@ def test_uses_constant_time_compare():
 
 
 def test_security_headers(client):
-    for path in ["/admin", "/admin/app.js", "/api/health", "/"]:
+    login(client)
+    for path in ["/admin", "/admin/login.js", "/admin/panel/", "/admin/panel/app.js", "/api/health", "/"]:
         r = client.get(path)
+        assert r.status_code == 200, path
         assert r.headers["x-frame-options"] == "DENY"
         assert r.headers["x-content-type-options"] == "nosniff"
         assert r.headers["referrer-policy"] == "no-referrer"
@@ -183,18 +185,149 @@ def test_hsts_only_on_https(make_client):
     assert "max-age" in c.get("/api/health", headers={"X-Forwarded-Proto": "https"}).headers["strict-transport-security"]
 
 
-def test_no_inline_script_or_style_in_admin_html(client):
-    html = client.get("/admin").text
+def test_no_inline_script_or_style_in_admin_html(admin):
     import re
-    assert not re.search(r"<script(?![^>]*\bsrc=)", html)
-    assert "<style" not in html and " style=" not in html and " onclick=" not in html
+    for path in ("/admin", "/admin/panel/"):
+        html = admin.get(path).text
+        assert not re.search(r"<script(?![^>]*\bsrc=)", html), path
+        assert "<style" not in html and " style=" not in html and " onclick=" not in html, path
 
 
-def test_static_whitelist_no_traversal(client):
-    for p in ["/admin/../main.py", "/admin/%2e%2e/main.py", "/admin/main.py", "/admin/index.html", "/admin/..%2fconfig.py"]:
-        assert client.get(p).status_code in (404, 307, 400), p
-    assert client.get("/admin/app.js").status_code == 200
-    assert client.get("/admin/admin.css").status_code == 200
+def test_static_whitelist_no_traversal(admin):
+    for p in ["/admin/../main.py", "/admin/%2e%2e/main.py", "/admin/main.py", "/admin/index.html", "/admin/..%2fconfig.py",
+              "/admin/panel/../main.py", "/admin/panel/%2e%2e/main.py", "/admin/panel/main.py", "/admin/panel/index.html",
+              "/admin/panel/..%2fconfig.py", "/admin/panel/login.html"]:
+        assert admin.get(p).status_code in (404, 307, 400), p
+    assert admin.get("/admin/panel/app.js").status_code == 200
+    assert admin.get("/admin/panel/admin.css").status_code == 200
+
+
+# ---- панель отдаётся только после входа ----
+PANEL_FILES = ["/admin/panel/app.js", "/admin/panel/admin.css", "/admin/panel/app.js?x=1", "/admin/panel/nope.js"]
+
+
+@pytest.mark.parametrize("path", PANEL_FILES)
+def test_panel_assets_require_auth(client, path):
+    r = client.get(path)
+    assert r.status_code == 401
+    assert "fetchJson" not in r.text and "logoutBtn" not in r.text and "mainView" not in r.text
+
+
+def test_panel_index_redirects_to_login_without_session(client):
+    for p in ("/admin/panel", "/admin/panel/"):
+        r = client.get(p, follow_redirects=False)
+        assert r.status_code == 302 and r.headers["location"] == "/admin/"
+        assert "mainView" not in r.text
+
+
+def test_old_public_panel_paths_gone(client):
+    for p in ("/admin/app.js", "/admin/admin.css", "/admin/index.html"):
+        r = client.get(p)
+        assert r.status_code == 404 and "logoutBtn" not in r.text and "api/admin" not in r.text
+
+
+def test_login_page_public_and_has_no_panel_code(client):
+    r = client.get("/admin")
+    assert r.status_code == 200 and client.get("/admin/").status_code == 200
+    assert 'id="loginForm"' in r.text and "mainView" not in r.text and "/admin/panel/" not in r.text
+    js = client.get("/admin/login.js")
+    assert js.status_code == 200 and "loadSessions" not in js.text and "export" not in js.text.lower().split("fetch")[0]
+    assert client.get("/admin/login.css").status_code == 200
+
+
+def test_panel_served_with_session_and_no_store(admin):
+    r = admin.get("/admin/panel/")
+    assert r.status_code == 200 and 'id="mainView"' in r.text and 'id="loginForm"' not in r.text
+    assert "/admin/panel/app.js" in r.text and "/admin/panel/admin.css" in r.text
+    assert r.headers["cache-control"] == "no-store"
+    assert "script-src 'self'" in r.headers["content-security-policy"]
+    js = admin.get("/admin/panel/app.js")
+    assert js.status_code == 200 and js.headers["content-type"].startswith("text/javascript") and js.headers["cache-control"] == "no-store"
+    assert admin.get("/admin/panel/admin.css").headers["content-type"].startswith("text/css")
+    assert admin.get("/admin/panel/nope.js").status_code == 404
+
+
+def test_panel_again_401_after_logout(admin):
+    cookie = admin.cookies.get("fah_admin")
+    assert admin.get("/admin/panel/app.js").status_code == 200
+    assert admin.post("/api/admin/logout", headers=admin.h).status_code == 200
+    admin.cookies.clear()
+    assert admin.get("/admin/panel/app.js").status_code == 401
+    admin.cookies.set("fah_admin", cookie)             # повтор старой куки
+    assert admin.get("/admin/panel/app.js").status_code == 401
+    assert admin.get("/admin/panel/", follow_redirects=False).status_code == 302
+
+
+def test_panel_rejects_forged_cookie(client):
+    client.cookies.set("fah_admin", "abc.def")
+    assert client.get("/admin/panel/app.js").status_code == 401
+
+
+# ---- прокси Cloudflare: секрет, IP, Origin ----
+SECRET = "s" * 40
+PROXY = {"X-FAH-Proxy-Secret": SECRET}
+
+
+def proxied(ip, **extra):
+    return {**PROXY, "X-FAH-Client-IP": ip, "Origin": "https://aihubai.site", **extra}
+
+
+def test_short_proxy_secret_disables_proxy_mode(make_client):
+    c = make_client(LOGIN_MAX_FAILS=2, PROXY_SECRET="short", ADMIN_ORIGINS="https://aihubai.site")
+    assert c.app.state.settings.proxy_secret == ""
+    h = {"X-FAH-Proxy-Secret": "short", "X-FAH-Client-IP": "9.9.9.9", "Origin": "https://aihubai.site"}
+    assert c.post("/api/admin/login", json={"password": PASSWORD}, headers=h).status_code == 403   # чужой Origin
+
+
+def test_proxy_origin_accepted_only_with_secret(make_client):
+    c = make_client(PROXY_SECRET=SECRET, ADMIN_ORIGINS="https://aihubai.site,https://www.aihubai.site")
+    o = {"Origin": "https://aihubai.site"}
+    assert c.post("/api/admin/login", json={"password": PASSWORD}, headers=o).status_code == 403
+    assert c.post("/api/admin/login", json={"password": PASSWORD}, headers={**o, "X-FAH-Proxy-Secret": "w" * 40}).status_code == 403
+    r = c.post("/api/admin/login", json={"password": PASSWORD}, headers=proxied("5.5.5.5"))
+    assert r.status_code == 200
+    h = {"X-CSRF-Token": r.json()["csrf"]}
+    assert c.post("/api/admin/cleanup", json={}, headers={**h, **proxied("5.5.5.5")}).status_code == 200
+    assert c.post("/api/admin/cleanup", json={}, headers={**h, **proxied("5.5.5.5", Origin="https://www.aihubai.site")}).status_code == 200
+    assert c.post("/api/admin/cleanup", json={}, headers={**h, **proxied("5.5.5.5", Origin="https://evil.com")}).status_code == 403
+    assert c.post("/api/admin/cleanup", json={}, headers={**h, **proxied("5.5.5.5", Origin="https://aihubai.site.evil.com")}).status_code == 403
+    assert c.post("/api/admin/cleanup", json={}, headers={**h, "Origin": "https://aihubai.site"}).status_code == 403   # без секрета
+
+
+def test_admin_origin_not_enabled_by_default(make_client):
+    c = make_client(PROXY_SECRET=SECRET)
+    assert c.post("/api/admin/login", json={"password": PASSWORD}, headers=proxied("5.5.5.5")).status_code == 403
+
+
+def test_lockout_keyed_on_proxied_client_ip(make_client):
+    c = make_client(LOGIN_MAX_FAILS=2, TRUST_PROXY="1", PROXY_SECRET=SECRET, ADMIN_ORIGINS="https://aihubai.site")
+    for _ in range(2):
+        assert c.post("/api/admin/login", json={"password": "bad"}, headers=proxied("1.1.1.1")).status_code == 401
+    assert c.post("/api/admin/login", json={"password": PASSWORD}, headers=proxied("1.1.1.1")).status_code == 429
+    assert c.post("/api/admin/login", json={"password": PASSWORD}, headers=proxied("2.2.2.2")).status_code == 200
+
+
+def test_spoofed_ip_headers_cannot_bypass_lockout(make_client):
+    """Без верного секрета X-FAH-Client-IP и CF-Connecting-IP игнорируются: ротация «адресов» не сбрасывает блокировку."""
+    c = make_client(LOGIN_MAX_FAILS=2, TRUST_PROXY="1", PROXY_SECRET=SECRET)
+    for i in range(2):
+        assert c.post("/api/admin/login", json={"password": "bad"},
+                      headers={"X-FAH-Client-IP": f"7.7.7.{i}", "CF-Connecting-IP": f"8.8.8.{i}"}).status_code == 401
+    r = c.post("/api/admin/login", json={"password": PASSWORD}, headers={"X-FAH-Client-IP": "7.7.7.99", "CF-Connecting-IP": "8.8.8.99",
+                                                                          "X-FAH-Proxy-Secret": "x" * 40})
+    assert r.status_code == 429
+    r = c.post("/api/admin/login", json={"password": PASSWORD}, headers={"X-FAH-Client-IP": "7.7.7.5"})
+    assert r.status_code == 429
+
+
+def test_cf_connecting_ip_not_trusted_by_default(make_client):
+    from app.security import client_ip
+    assert client_ip({"cf-connecting-ip": "1.2.3.4", "x-forwarded-for": "9.9.9.9"}, "10.0.0.1", True) == "9.9.9.9"
+    assert client_ip({"cf-connecting-ip": "1.2.3.4"}, "10.0.0.1", True, trust_cf_ip=True) == "1.2.3.4"
+    assert client_ip({"cf-connecting-ip": "1.2.3.4"}, "10.0.0.1", False) == "10.0.0.1"
+    assert client_ip({"x-fah-proxy-secret": SECRET, "x-fah-client-ip": "not-an-ip", "x-forwarded-for": "9.9.9.9"}, "10.0.0.1", True, SECRET) == "9.9.9.9"
+    assert client_ip({"x-fah-proxy-secret": SECRET, "x-fah-client-ip": "2001:db8::1"}, "10.0.0.1", False, SECRET) == "2001:db8::1"
+    assert client_ip({"x-fah-client-ip": "1.2.3.4"}, "10.0.0.1", True, SECRET) == "10.0.0.1"
 
 
 def test_docs_and_openapi_disabled(client):

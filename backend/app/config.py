@@ -72,6 +72,9 @@ class Settings:
     login_global_lock_minutes: int = 5
     login_fail_delay: float = 0.4
     ip_hash_rotate_daily: bool = True
+    trust_cf_ip: bool = False
+    proxy_secret: str = ""
+    admin_origins: tuple[str, ...] = ()
     allow_no_origin: bool = False
     cleanup_interval_s: int = 3600
     secret_is_ephemeral: bool = False
@@ -95,6 +98,9 @@ class Settings:
         if len(secret) < 16:
             secret = secrets.token_urlsafe(32)  # на время жизни процесса; админ-сессии не переживут рестарт
             ephemeral = True
+        proxy_secret = e.get("PROXY_SECRET", "").strip()
+        if len(proxy_secret) < 32:
+            proxy_secret = ""      # слишком короткий секрет = прокси-режим выключен (fail closed)
         origins = tuple(x.strip() for x in e.get("ALLOWED_ORIGINS", DEFAULT_ORIGINS).split(",") if x.strip())
         return cls(
             db_path=e.get("DB_PATH", "data/fah.db"),
@@ -118,6 +124,9 @@ class Settings:
             login_global_lock_minutes=_int(e.get("LOGIN_GLOBAL_LOCK_MINUTES"), 5, 1, 10080),
             login_fail_delay=float(e.get("LOGIN_FAIL_DELAY", "0.4") or 0.4),
             ip_hash_rotate_daily=_bool(e.get("IP_HASH_ROTATE_DAILY"), True),
+            trust_cf_ip=_bool(e.get("TRUST_CF_IP"), False),
+            proxy_secret=proxy_secret,
+            admin_origins=tuple(x.strip().rstrip("/").lower() for x in e.get("ADMIN_ORIGINS", "").split(",") if x.strip()),
             allow_no_origin=_bool(e.get("ALLOW_NO_ORIGIN"), False),
             cleanup_interval_s=_int(e.get("CLEANUP_INTERVAL_S"), 3600, 1),
             secret_is_ephemeral=ephemeral,

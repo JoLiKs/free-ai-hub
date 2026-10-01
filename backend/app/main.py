@@ -15,13 +15,13 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
 
 from . import __version__
 from .config import Settings, load_dotenv
 from .db import Database
 from .ratelimit import DailyQuota, LoginGuard, RateLimiter
-from .security import AdminAuth, client_ip, country_from, hash_ip
+from .security import AdminAuth, client_ip, country_from, hash_ip, proxy_verified
 
 log = logging.getLogger("fah")
 STATIC = Path(__file__).parent / "static"
@@ -189,7 +189,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # -------------------------------------------------- вспомогательное --------------------------------------------------
     def ip_of(request: Request) -> str:
         peer = request.client.host if request.client else None
-        return client_ip(request.headers, peer, s.trust_proxy)
+        return client_ip(request.headers, peer, s.trust_proxy, s.proxy_secret, s.trust_cf_ip)
 
     def ip_key(request: Request) -> str:
         return hash_ip(ip_of(request), s.secret_key, s.ip_hash_rotate_daily)
@@ -280,9 +280,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return True
         host = request.headers.get("host", "")
         try:
-            return urlsplit(o).netloc.lower() == host.lower()
+            if urlsplit(o).netloc.lower() == host.lower():
+                return True
         except ValueError:
             return False
+        # запрос через Cloudflare-прокси (Pages Function): Origin = сайт (aihubai.site), Host = бэкенд.
+        # Принимаем только из ADMIN_ORIGINS и только если прокси доказал себя секретом X-FAH-Proxy-Secret.
+        return bool(s.admin_origins) and o.strip().rstrip("/").lower() in s.admin_origins and proxy_verified(request.headers, s.proxy_secret)
 
     def current(request: Request) -> dict[str, Any] | None:
         return auth.parse(request.cookies.get(auth.cookie_name)) if auth.enabled else None
@@ -473,18 +477,36 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         raise HTTPException(404, "Не найдено")
 
     # -------------------------------------------------- статика админки --------------------------------------------------
-    ASSETS = {"app.js": "text/javascript; charset=utf-8", "admin.css": "text/css; charset=utf-8"}
+    # Публично (без входа) отдаётся ТОЛЬКО страница входа: /admin, /admin/login.js, /admin/login.css (без данных и кода панели).
+    # Сама панель (index.html, app.js, admin.css) лежит под /admin/panel/ и отдаётся только с валидной сессией.
+    LOGIN_ASSETS = {"login.js": "text/javascript; charset=utf-8", "login.css": "text/css; charset=utf-8"}
+    PANEL_ASSETS = {"app.js": "text/javascript; charset=utf-8", "admin.css": "text/css; charset=utf-8"}
 
     @app.get("/admin")
     @app.get("/admin/")
-    def admin_index():
+    def admin_login_page():
+        return FileResponse(STATIC / "login.html", media_type="text/html; charset=utf-8")
+
+    @app.get("/admin/panel")
+    @app.get("/admin/panel/")
+    def admin_panel_index(request: Request):
+        if not current(request):
+            return RedirectResponse("/admin/", status_code=302)      # относительный Location — работает и через прокси
         return FileResponse(STATIC / "index.html", media_type="text/html; charset=utf-8")
 
-    @app.get("/admin/{name}")
-    def admin_asset(name: str):
-        if name not in ASSETS:
+    @app.get("/admin/panel/{name}")
+    def admin_panel_asset(name: str, request: Request):
+        if not current(request):
+            raise HTTPException(401, "Требуется вход")
+        if name not in PANEL_ASSETS:
             raise HTTPException(404, "Не найдено")
-        return FileResponse(STATIC / name, media_type=ASSETS[name], headers={"Cache-Control": "no-cache"})
+        return FileResponse(STATIC / name, media_type=PANEL_ASSETS[name])
+
+    @app.get("/admin/{name}")
+    def admin_login_asset(name: str):
+        if name not in LOGIN_ASSETS:
+            raise HTTPException(404, "Не найдено")
+        return FileResponse(STATIC / name, media_type=LOGIN_ASSETS[name])
 
     @app.get("/robots.txt")
     def robots():

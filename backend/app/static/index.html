@@ -7,22 +7,10 @@
   <meta name="color-scheme" content="dark">
   <title>Free AI Hub — админ-панель</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="/admin/admin.css">
+  <link rel="stylesheet" href="/admin/panel/admin.css">
 </head>
 <body>
 <div id="app">
-  <!-- вход -->
-  <main id="loginView" class="login-wrap" hidden>
-    <form id="loginForm" class="card login" autocomplete="off">
-      <div class="brand"><span class="logo" aria-hidden="true">✦</span><div><h1 data-text="Free AI Hub">Free AI Hub</h1><p>админ-панель</p></div></div>
-      <label for="pw" class="lbl">Пароль администратора</label>
-      <input id="pw" name="password" type="password" class="field" autocomplete="current-password" required autofocus>
-      <p id="loginErr" class="err" role="alert" hidden></p>
-      <button class="btn primary wide" type="submit">Войти</button>
-      <p class="hint">Доступ только для владельца сайта. После нескольких неверных попыток вход временно блокируется.</p>
-    </form>
-  </main>
-
   <!-- основной экран -->
   <div id="mainView" class="shell" hidden>
     <header class="top">
@@ -115,6 +103,6 @@
   <div id="toasts" class="toasts" aria-live="polite"></div>
   <dialog id="dlg" class="dialog"><form method="dialog"><h2 id="dlgTitle"></h2><p id="dlgText"></p><div id="dlgInputWrap" hidden><input id="dlgInput" class="field" autocomplete="off"></div><div class="row end"><button class="btn" value="cancel">Отмена</button><button id="dlgOk" class="btn danger" value="ok">Удалить</button></div></form></dialog>
 </div>
-<script src="/admin/app.js" defer></script>
+<script src="/admin/panel/app.js" defer></script>
 </body>
 </html>

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ru" data-theme="cyber">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="dark">
+  <title>Free AI Hub — вход</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/admin/login.css">
+</head>
+<body>
+<main class="login-wrap">
+  <form id="loginForm" class="card login" autocomplete="off">
+    <div class="brand"><span class="logo" aria-hidden="true">✦</span><div><h1>Free AI Hub</h1><p>админ-панель</p></div></div>
+    <label for="pw" class="lbl">Пароль администратора</label>
+    <input id="pw" name="password" type="password" class="field" autocomplete="current-password" required autofocus>
+    <p id="loginErr" class="err" role="alert" hidden></p>
+    <button class="btn primary wide" type="submit">Войти</button>
+    <p class="hint">Доступ только для владельца сайта. После нескольких неверных попыток вход временно блокируется.</p>
+  </form>
+</main>
+<script src="/admin/login.js" defer></script>
+</body>
+</html>

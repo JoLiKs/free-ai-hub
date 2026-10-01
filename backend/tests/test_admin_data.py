@@ -95,8 +95,8 @@ def test_xss_payload_returned_as_data_only(admin):
     assert ex.headers["content-type"].startswith("application/json") and ex.headers["x-content-type-options"] == "nosniff"
 
 
-def test_admin_js_never_uses_innerhtml(client):
-    js = client.get("/admin/app.js").text
+def test_admin_js_never_uses_innerhtml(admin):
+    js = admin.get("/admin/panel/app.js").text + admin.get("/admin/login.js").text
     for bad in ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "eval(", "new Function", "srcdoc"):
         assert bad not in js, bad
 

@@ -1,8 +1,8 @@
 /* Безопасный markdown → HTML. Весь пользовательский/модельный текст экранируется;
  * ссылки — только http(s)/mailto, с rel="noopener noreferrer nofollow". Поддержка: заголовки, списки (вложенные, задачи),
  * таблицы, цитаты, hr, ``` блоки с подсветкой и кнопкой копирования, inline-код, **жирный**, *курсив*, ~~зачёркнутый~~, автоссылки. */
-import { esc } from './util.js?v=3.12';
-import { highlight } from './highlight.js?v=3.12';
+import { esc } from './util.js?v=3.13';
+import { highlight } from './highlight.js?v=3.13';
 
 const SAFE_URL = /^(https?:\/\/|mailto:)[^\s<>"'`]+$/i;
 

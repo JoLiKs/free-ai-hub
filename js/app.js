@@ -1,19 +1,19 @@
 /* Free AI Hub v2 — точка входа: собирает UI из модулей. Без сборки, без зависимостей. */
-import { esc, sleep, debounce, estimateTokens, fmtAgo, fmtBytes, abortError } from './util.js?v=3.12';
-import { store } from './store.js?v=3.12';
-import { PROVIDERS, pById, FALLBACK_ORDER, SYSTEM_PRESETS, SUGGESTIONS, supportsVision } from './providers.js?v=3.12';
-import { state, saveSettings, saveSettingsNow, saveKeys, getKey, slotPid, slotProvider, slotModel, setSlotModel, slotMsgs, isBusy, modelInfo, modelLabel } from './state.js?v=3.12';
-import { explainError, isFallbackWorthy, setProxy, baseOf } from './api.js?v=3.12';
-import { generate, prepareMessages } from './generate.js?v=3.12';
-import { getModels, staticModels, favs, healthStore, checkProvider, healthLabel, providerSummary, HEALTH_STALE } from './models.js?v=3.12';
-import { ChatStore, newChat, chatTitleFrom, exportMarkdown, exportName, shareMessages } from './chats.js?v=3.12';
-import { $, toast, announce, showBanner, confirmDialog, promptDialog, openPopover, closePopover, popoverOpen, isMobile } from './ui.js?v=3.12';
-import { createMsgNode, paintMsg, paintActions, setStatus, emptyStateNode } from './messages.js?v=3.12';
-import { localSupported, webgpuAvailable } from './local.js?v=3.12';
-import { capabilityAnswer, IMAGE_TEXT_HINT, stripMarker, emptyReplyText, detectImageIntent, isVideoRequest, isExplicitImageRequest, isCapabilityQuestion, VIDEO_UNSUPPORTED, planImage, imageUrl, isFollowUp, mentionsImage, imageMarker, isImageRefusal, IMAGE_SYSTEM_HINT, askPollinations, firstOf, classifierSystem, parseClassifier } from './imggen.js?v=3.12';
-import { BACKEND_URL, LOG_LOCAL_MODEL, ADSENSE_CLIENT, ADSENSE_SLOT } from './config.js?v=3.12';
-import { createAds, showAdsDialog, ADS_PRIVACY_NOTE } from './ads.js?v=3.12';
-import { createTelemetry } from './telemetry.js?v=3.12';
+import { esc, sleep, debounce, estimateTokens, fmtAgo, fmtBytes, abortError } from './util.js?v=3.13';
+import { store } from './store.js?v=3.13';
+import { PROVIDERS, pById, FALLBACK_ORDER, SYSTEM_PRESETS, SUGGESTIONS, supportsVision } from './providers.js?v=3.13';
+import { state, saveSettings, saveSettingsNow, saveKeys, getKey, slotPid, slotProvider, slotModel, setSlotModel, slotMsgs, isBusy, modelInfo, modelLabel } from './state.js?v=3.13';
+import { explainError, isFallbackWorthy, setProxy, baseOf } from './api.js?v=3.13';
+import { generate, prepareMessages } from './generate.js?v=3.13';
+import { getModels, staticModels, favs, healthStore, checkProvider, healthLabel, providerSummary, HEALTH_STALE } from './models.js?v=3.13';
+import { ChatStore, newChat, chatTitleFrom, exportMarkdown, exportName, shareMessages } from './chats.js?v=3.13';
+import { $, toast, announce, showBanner, confirmDialog, promptDialog, openPopover, closePopover, popoverOpen, isMobile } from './ui.js?v=3.13';
+import { createMsgNode, paintMsg, paintActions, setStatus, emptyStateNode } from './messages.js?v=3.13';
+import { localSupported, webgpuAvailable } from './local.js?v=3.13';
+import { capabilityAnswer, IMAGE_TEXT_HINT, stripMarker, emptyReplyText, detectImageIntent, isVideoRequest, isExplicitImageRequest, isCapabilityQuestion, VIDEO_UNSUPPORTED, planImage, imageUrl, isFollowUp, mentionsImage, imageMarker, isImageRefusal, IMAGE_SYSTEM_HINT, askPollinations, firstOf, classifierSystem, parseClassifier } from './imggen.js?v=3.13';
+import { BACKEND_URL, LOG_LOCAL_MODEL, ADSENSE_CLIENT, ADSENSE_SLOT } from './config.js?v=3.13';
+import { createAds, showAdsDialog, ADS_PRIVACY_NOTE } from './ads.js?v=3.13';
+import { createTelemetry } from './telemetry.js?v=3.13';
 
 const chats = new ChatStore(store);
 // журнал на сервере владельца: включается только если задан BACKEND_URL и пользователь согласился
@@ -577,7 +577,7 @@ async function runSlot(slot, userText, { regenerate = false, images = null } = {
       for (const x of messages) delete x.images;
     }
     if (trimmed) toast(`Старые сообщения (${trimmed}) не вошли в контекст модели`, { ms: 3500 });
-    if (pp.keyMode === 'required' && !getKey(pp.id)) { const { HttpError } = await import('./api.js?v=3.12'); throw new HttpError(401, ''); }
+    if (pp.keyMode === 'required' && !getKey(pp.id)) { const { HttpError } = await import('./api.js?v=3.13'); throw new HttpError(401, ''); }
     if (pp.custom && !S.customUrl.trim()) throw new Error('Укажите Base URL эндпоинта в блоке «Свой ключ».');
     if (pp.needsProxy && !baseOf(pp)) throw new Error('Для «' + pp.name + '» нужен свой CORS-прокси: разверните proxy/worker.js и укажите адрес в «Настройки → CORS-прокси».');
     if (!mm) throw new Error('Не выбрана модель.');

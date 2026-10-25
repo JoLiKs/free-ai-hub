@@ -4,9 +4,9 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CLIENT_RE, isValidClient, isValidSlot, scriptUrl, createAds, ADS_PRIVACY_NOTE } from '../js/ads.js?v=3.12';
-import * as cfg from '../js/config.js?v=3.12';
-import { makeMemoryStore } from '../js/store.js?v=3.12';
+import { CLIENT_RE, isValidClient, isValidSlot, scriptUrl, createAds, ADS_PRIVACY_NOTE } from '../js/ads.js?v=3.13';
+import * as cfg from '../js/config.js?v=3.13';
+import { makeMemoryStore } from '../js/store.js?v=3.13';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const tests = []; const t = (n, f) => tests.push([n, f]);

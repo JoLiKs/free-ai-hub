@@ -1,7 +1,7 @@
 /* «Поделиться диалогом»: подготовка сообщений, импорт, безопасный вывод. node tests/share.test.mjs */
 import assert from 'node:assert/strict';
-import { shareMessages, chatFromShared, newChat } from '../js/chats.js?v=3.12';
-import { renderMarkdown } from '../js/markdown.js?v=3.12';
+import { shareMessages, chatFromShared, newChat } from '../js/chats.js?v=3.13';
+import { renderMarkdown } from '../js/markdown.js?v=3.13';
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('  ok', name); };
 
 t('shareMessages: only text, no errors/streaming/empty/images, model label kept', () => {

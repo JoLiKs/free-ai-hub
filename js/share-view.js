@@ -1,9 +1,9 @@
 /* Страница просмотра общего диалога (/s/<id>). Весь текст: пользователь — textContent, модель — безопасный renderMarkdown (экранирует всё). */
-import { renderMarkdown, splitThink } from './markdown.js?v=3.12';
-import { paintImage } from './messages.js?v=3.12';
-import { safeImageUrl } from './imggen.js?v=3.12';
-import { ChatStore, chatFromShared } from './chats.js?v=3.12';
-import { store } from './store.js?v=3.12';
+import { renderMarkdown, splitThink } from './markdown.js?v=3.13';
+import { paintImage } from './messages.js?v=3.13';
+import { safeImageUrl } from './imggen.js?v=3.13';
+import { ChatStore, chatFromShared } from './chats.js?v=3.13';
+import { store } from './store.js?v=3.13';
 
 const $ = id => document.getElementById(id);
 const ID_RE = /^[A-Za-z0-9_-]{16}$/;

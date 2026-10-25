@@ -1,5 +1,5 @@
 /* Лёгкая подсветка синтаксиса без зависимостей. Возвращает БЕЗОПАСНЫЙ html (всё экранируется). */
-import { esc } from './util.js?v=3.9';
+import { esc } from './util.js?v=3.10';
 
 const KW = {
   js: 'as async await break case catch class const continue debugger default delete do else export extends finally for from function get if import in instanceof let new of return set static super switch this throw try typeof var void while with yield null true false undefined interface type enum implements public private protected readonly namespace declare abstract',

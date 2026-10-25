@@ -1,6 +1,6 @@
 /* Сетевой слой: запросы к провайдерам, потоковый разбор SSE, «размышления», таймауты, повторы, очередь. */
-import { abortError } from './util.js?v=3.9';
-import { limiterFor, QueueWaitError } from './limiter.js?v=3.9';
+import { abortError } from './util.js?v=3.10';
+import { limiterFor, QueueWaitError } from './limiter.js?v=3.10';
 export { QueueWaitError };
 
 /* ------------------------------ ошибки -------------------------------- */

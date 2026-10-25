@@ -1,5 +1,5 @@
 // Детектор запросов картинок: 60+ фраз (явные, разговорные, с опечатками, без глагола, EN) + ложные срабатывания + продолжения.
-import { detectImageIntent as d, isVideoRequest, isFollowUp, isImageRefusal, imageMarker, planImage } from '../js/imggen.js?v=3.9';
+import { detectImageIntent as d, isVideoRequest, isExplicitImageRequest as ex, isCapabilityQuestion as cq, isFollowUp, isImageRefusal, imageMarker, planImage } from '../js/imggen.js?v=3.10';
 const YES = [ // ожидаем 'yes' или 'maybe' (идёт на генерацию/классификатор), но НЕ 'no'
   'картинка крысы', 'крыса картинкой', 'нарисуй мне крысу', 'а можешь картинку с крысой?', 'сгенерь крысу', 'фото крысы в шляпе',
   'Сделай картинку с крысой', 'можешь сделать картинку с крысой', 'хочу картинку крысы', 'Давай картинку с крысой', 'создай кртинку крысы',
@@ -52,5 +52,15 @@ for (const t of ['как смонтировать видео на телефон
 const no = async () => ({ image: false, prompt: '' });
 if (await planImage('сгенерируй мне текст поздравления', { llm: no })) fail('classifier "no" must be respected');
 if (await planImage('сгенерируй крысу', { llm: boom })) fail('bare generate verb on classifier failure must not draw');
-const n = TEXT_ONLY.length + YES.length + NO.length + FOLLOW.length + NOTFOLLOW.length;
+
+// баг 26.10: вопросы о возможностях в любом порядке слов — текст; маркер только при явной просьбе
+const CAP = ['картинки умеешь?', 'рисуешь?', 'умеешь рисовать', 'фотки делаешь?', 'а изображения можешь?', 'can you draw', 'can you draw?', 'Картинки делаешь?',
+  'а ты рисуешь?', 'ты умеешь картинки?', 'изображения генерируешь?', 'а фото можешь?', 'рисовать умеешь?', 'а картинки?', 'умеешь генерировать изображения',
+  'can you make pictures?', 'do you generate images?', 'are you able to draw?', 'ты вообще рисовать можешь?', 'а логотипы делаешь?'];
+for (const t of CAP) { if (d(t) !== 'no') fail('cap-question intent:', t, d(t)); if (ex(t)) fail('cap-question explicit:', t); if (isFollowUp(t)) fail('cap-question follow:', t); }
+const EXPL = ['нарисуй кота', 'Нарисуй мне кота в шляпе', 'сгенерируй картинку с драконом', 'сделай картинку заката', 'draw me a cat', 'generate an image of a red car',
+  'можешь нарисовать крысу?', 'А картинку с крысой можешь?', 'покажи картинку с котом', 'создай логотип для кофейни', 'изобрази город будущего', 'нарисуешь собаку?'];
+for (const t of EXPL) { if (d(t) === 'no') fail('explicit missed:', t); if (!ex(t)) fail('explicit not explicit:', t); }
+for (const t of ['Привет', 'Ты шо прикалуешься', 'что такое нейросеть?', 'сколько стоит фотоаппарат?', 'как дела?']) if (ex(t)) fail('marker would draw:', t);
+const n = CAP.length + EXPL.length + 5 + TEXT_ONLY.length + YES.length + NO.length + FOLLOW.length + NOTFOLLOW.length;
 console.log(bad ? `FAIL ${bad}` : `imggen tests: ${n} phrases OK`); process.exit(bad ? 1 : 0);

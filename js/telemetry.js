@@ -5,7 +5,7 @@
  *   вложенные картинки, настройки. Если пользователь вставил в чат свой сохранённый ключ — он вырезается из текста.
  * Если BACKEND_URL пуст или согласия нет — не делает ничего. Любая ошибка сети молча игнорируется и не блокирует чат.
  * Модуль не обращается к DOM на верхнем уровне (тестируется в Node). */
-import { store as defaultStore } from './store.js?v=3.9';
+import { store as defaultStore } from './store.js?v=3.10';
 
 export const MAX_TEXT = 20000;
 const KEEPALIVE_LIMIT = 60000;      // fetch keepalive ограничен ~64 КиБ тела

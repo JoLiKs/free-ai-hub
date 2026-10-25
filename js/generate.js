@@ -1,8 +1,8 @@
 /* Единая точка генерации: облачные провайдеры (api.js) и модель в браузере (local.js). */
-import { chat, HttpError } from './api.js?v=3.9';
-import { generateLocal } from './local.js?v=3.9';
-import { estimateTokens } from './util.js?v=3.9';
-import { limiterFor } from './limiter.js?v=3.9';
+import { chat, HttpError } from './api.js?v=3.10';
+import { generateLocal } from './local.js?v=3.10';
+import { estimateTokens } from './util.js?v=3.10';
+import { limiterFor } from './limiter.js?v=3.10';
 
 const stripThink = s => String(s || '').replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim();
 

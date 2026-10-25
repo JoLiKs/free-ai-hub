@@ -46,11 +46,33 @@ export function isVideoRequest(text) {
 export const VIDEO_UNSUPPORTED = '🎬 Генерировать видео я, к сожалению, не умею — на этом сайте доступны только текстовые ответы и генерация картинок. Могу нарисовать картинку (например, кадр или постер на эту тему), написать сценарий, раскадровку или подсказать сервисы для генерации видео.';
 
 /** 'yes' — явная просьба; 'maybe' — проверить классификатором; 'no' — точно текст. */
+// явная просьба-императив: «нарисуй», «сгенерируй/сделай/создай/покажи/дай … картинку», «draw me», «generate an image»
+const IMPER = RX(B0 + W('(?:нарисуй\\w*|изобрази\\w*|отрисуй\\w*|намалюй\\w*|набросай\\w*|дорисуй\\w*|перерисуй\\w*|визуализируй\\w*|[сз]г[еи]н[еи]рируй\\w*|[сз]генерь\\w*|генерни\\w*)') + B1 + '|^\\s*(?:please\\s+)?(?:draw|paint|sketch|illustrate|render|generate|create|make|design)\\b');
+const IMPER_MAKE = RX(B0 + W('(?:сделай\\w*|создай\\w*|покажи\\w*|дай|дайте|скинь\\w*|пришли\\w*|сотвори\\w*|запили\\w*|замути\\w*)') + B1);
+const QWORD = RX('^\\s*(?:а\\s+|и\\s+|ну\\s+)?' + W('(?:ты|вы|можешь|можете|умеешь|умеете|способ\\w*|правда|реально|разве|неужели|ли|как|что|чем|почему|зачем|какие|какой|сколько|где|когда|кто)') + B1 + '|^\\s*(?:can|could|do|does|are|is|will|would|what|how|why)\\b');
+// слова «о возможностях»: если кроме них в вопросе ничего нет — это вопрос, а не заказ конкретной картинки
+const CAPWORD = RX('^(?:' + W('(?:а|и|ну|ты|вы|тоже|ещ[её]|вообще|ли|же|мне|нам|сам|сама|это|так|да|нет|бы|правда|реально|разве|неужели|тут|здесь|сайт|бот|нейросеть|уме\\w*|мож\\w*|могл?\\w*|способ\\w*|дела\\w*|сдела\\w*|рису\\w*|нарис\\w*|созда\\w*|[сз]?г[еи]н[еи]р\\w*|генер\\w*|присыла\\w*|показыва\\w*|выда\\w*|поддерж\\w*|вида|какие|какой|любые|разные|свои|картин\\w*|картинк\\w*|фот\\w*|изображ\\w*|рисун\\w*|арт\\w*|иллюстр\\w*|пикч\\w*|лого\\w*|аватар\\w*|ави)') + '|can|could|you|u|do|does|are|is|able|to|me|a|an|the|any|also|really|draw|paint|make|create|generate|images?|pictures?|pics?|photos?|art|drawings?)$', 'iu');
+function onlyCapWords(t) { return t.toLowerCase().replace(/[^\p{L}\s-]/gu, ' ').split(/\s+/).filter(Boolean).every(w => CAPWORD.test(w)); }
+/** Вопрос о возможностях без явной просьбы («картинки умеешь?», «рисуешь?», «can you draw?») — отвечаем текстом. */
+export function isCapabilityQuestion(text) {
+  const t = String(text || '').trim();
+  const q = /\?\s*$/.test(t) || QWORD.test(t);
+  if (!q) return false;
+  if (/^\s*(?:please\s+)?draw\s+me\b/i.test(t)) return false;
+  return onlyCapWords(t);
+}
+/** Явная просьба (для маркера [[IMAGE]] / отказа модели): императив или «можешь нарисовать <что-то>?» с конкретным предметом. */
+export function isExplicitImageRequest(text) {
+  const t = String(text || '').trim();
+  if (!t || isCapabilityQuestion(t) || isVideoRequest(t) || NEGREQ.test(t) || HARDNEG.test(t)) return false;
+  return IMPER.test(t) || (IMPER_MAKE.test(t) && NOUN.test(t)) || (detectImageIntent(t) === 'yes' && !onlyCapWords(t));
+}
 export function detectImageIntent(text) {
   const t = String(text || '').trim();
   if (!t || t.length > 700) return 'no';
   if (isVideoRequest(t) && !NOUN.test(t)) return 'no';                   // видео — отдельный честный ответ, не картинка
   if (NEGREQ.test(t)) return 'no';                                      // «я не просил генерировать картинку»
+  if (isCapabilityQuestion(t)) return 'no';                             // вопрос о возможностях в любом порядке слов
   const noun = NOUN.test(t), draw = DRAW.test(t), gen = GEN.test(t), make = MAKE.test(t), neg = HARDNEG.test(t), q = /\?\s*$/.test(t);
   if (q && CAPQ.test(t)) return 'no';                                   // «а ты умеешь рисовать картинки?» — вопрос о возможностях
   if (q && (draw || gen) && !noun && /^\s*(?:а\s+)?\S+\s+(?:генерир\S*|рисовать|generate|draw)\s+(?:ты\s+)?(?:можешь|умеешь|can)?/iu.test(t) && t.split(/\s+/).length <= 4) return 'no';
@@ -65,7 +87,7 @@ export function detectImageIntent(text) {
   return 'no';
 }
 /** Короткая реплика-продолжение после картинки («ещё одну», «а теперь в синем цвете»). */
-export function isFollowUp(text) { const t = String(text || '').trim(); return !!t && t.length <= 160 && !HARDNEG.test(t) && !NEGREQ.test(t) && !isVideoRequest(t) && !(/\?\s*$/.test(t) && CAPQ.test(t)) && (FOLLOW.test(t) || detectImageIntent(t) !== 'no'); }
+export function isFollowUp(text) { const t = String(text || '').trim(); return !!t && t.length <= 160 && !HARDNEG.test(t) && !NEGREQ.test(t) && !isVideoRequest(t) && !isCapabilityQuestion(t) && !(/\?\s*$/.test(t) && CAPQ.test(t)) && (FOLLOW.test(t) || detectImageIntent(t) !== 'no'); }
 /** Ответ текстовой модели — отказ «не могу создавать изображения» или маркер [[IMAGE: …]]. */
 export function imageMarker(reply) { const m = String(reply || '').match(/\[\[\s*IMAGE\s*:\s*([^\]]{3,500})\]\]/i); return m ? m[1].trim() : ''; }
 export function isImageRefusal(reply) {

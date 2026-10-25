@@ -1,18 +1,19 @@
 /* Free AI Hub v2 — точка входа: собирает UI из модулей. Без сборки, без зависимостей. */
-import { esc, sleep, debounce, estimateTokens, fmtAgo, fmtBytes, abortError } from './util.js';
-import { store } from './store.js';
-import { PROVIDERS, pById, FALLBACK_ORDER, SYSTEM_PRESETS, SUGGESTIONS, supportsVision } from './providers.js';
-import { state, saveSettings, saveSettingsNow, saveKeys, getKey, slotPid, slotProvider, slotModel, setSlotModel, slotMsgs, isBusy, modelInfo, modelLabel } from './state.js';
-import { explainError, isFallbackWorthy, setProxy, baseOf } from './api.js';
-import { generate, prepareMessages } from './generate.js';
-import { getModels, staticModels, favs, healthStore, checkProvider, healthLabel, providerSummary, HEALTH_STALE } from './models.js';
-import { ChatStore, newChat, chatTitleFrom, exportMarkdown, exportName } from './chats.js';
-import { $, toast, announce, showBanner, confirmDialog, promptDialog, openPopover, closePopover, popoverOpen, isMobile } from './ui.js';
-import { createMsgNode, paintMsg, paintActions, setStatus, emptyStateNode } from './messages.js';
-import { localSupported, webgpuAvailable } from './local.js';
-import { BACKEND_URL, LOG_LOCAL_MODEL, ADSENSE_CLIENT, ADSENSE_SLOT } from './config.js';
-import { createAds, showAdsDialog, ADS_PRIVACY_NOTE } from './ads.js';
-import { createTelemetry } from './telemetry.js';
+import { esc, sleep, debounce, estimateTokens, fmtAgo, fmtBytes, abortError } from './util.js?v=3.9';
+import { store } from './store.js?v=3.9';
+import { PROVIDERS, pById, FALLBACK_ORDER, SYSTEM_PRESETS, SUGGESTIONS, supportsVision } from './providers.js?v=3.9';
+import { state, saveSettings, saveSettingsNow, saveKeys, getKey, slotPid, slotProvider, slotModel, setSlotModel, slotMsgs, isBusy, modelInfo, modelLabel } from './state.js?v=3.9';
+import { explainError, isFallbackWorthy, setProxy, baseOf } from './api.js?v=3.9';
+import { generate, prepareMessages } from './generate.js?v=3.9';
+import { getModels, staticModels, favs, healthStore, checkProvider, healthLabel, providerSummary, HEALTH_STALE } from './models.js?v=3.9';
+import { ChatStore, newChat, chatTitleFrom, exportMarkdown, exportName, shareMessages } from './chats.js?v=3.9';
+import { $, toast, announce, showBanner, confirmDialog, promptDialog, openPopover, closePopover, popoverOpen, isMobile } from './ui.js?v=3.9';
+import { createMsgNode, paintMsg, paintActions, setStatus, emptyStateNode } from './messages.js?v=3.9';
+import { localSupported, webgpuAvailable } from './local.js?v=3.9';
+import { detectImageIntent, isVideoRequest, VIDEO_UNSUPPORTED, planImage, imageUrl, isFollowUp, mentionsImage, imageMarker, isImageRefusal, IMAGE_SYSTEM_HINT, askPollinations, firstOf, classifierSystem, parseClassifier } from './imggen.js?v=3.9';
+import { BACKEND_URL, LOG_LOCAL_MODEL, ADSENSE_CLIENT, ADSENSE_SLOT } from './config.js?v=3.9';
+import { createAds, showAdsDialog, ADS_PRIVACY_NOTE } from './ads.js?v=3.9';
+import { createTelemetry } from './telemetry.js?v=3.9';
 
 const chats = new ChatStore(store);
 // журнал на сервере владельца: включается только если задан BACKEND_URL и пользователь согласился
@@ -122,7 +123,7 @@ async function selectProvider(slot, pid, { silent } = {}) {
   ensureModel(slot);
   renderSlotCard(slot); updateCur();
   if (slot === 'A') {
-    if (r.error && !silent) showBanner(r.error);
+    if (r.error && !r.quiet && !silent) showBanner(r.error);
     else if (!silent) showBanner('');
     if (pById(pid).keyMode === 'required' && !getKey(pid)) $('keyBoxA').open = true;
   }
@@ -498,6 +499,51 @@ function fallbackCandidates(slot, tried) {
   return out.slice(0, 4);
 }
 
+/* Генерация картинки (Pollinations), если пользователь явно просит изображение. true — ответ-картинка готов. */
+let imggenOn = true;
+async function imggenEnabled() {
+  const cfg = await Promise.race([window.FAH_SITE_CONFIG || Promise.resolve({ imggen: true }), sleep(1500).then(() => ({ imggen: true }))]).catch(() => ({ imggen: true }));
+  imggenOn = !(cfg && cfg.imggen === false); return imggenOn;
+}
+/* Генерация картинки (Pollinations), если пользователь просит изображение (или продолжение после картинки).
+ * force: {prompt?} — текстовая модель уже ответила маркером/отказом → точно картинка. true — ответ-картинка готов. */
+function prevImgPrompt(hist) { const a = [...hist].reverse().find(m => m.role === 'assistant'); return a && a.image && a.image.prompt || ''; }
+async function tryImage(slot, hist, reply, refs, signal, force = null) {
+  if (slot !== 'A') return false;
+  const lu = [...hist].reverse().find(m => m.role === 'user');
+  if (!lu || (lu._images && lu._images.length)) return false;
+  const prevImg = [...hist].reverse().find(m => m.role === 'assistant' && m.image && m.image.prompt);
+  const lastA = [...hist].reverse().find(m => m.role === 'assistant');
+  const prev = prevImg && lastA === prevImg ? prevImg.image.prompt : '';      // продолжение — только сразу после картинки
+  if (!force && isVideoRequest(lu.content) && detectImageIntent(lu.content) === 'no') {   // видео не умеем — честно текстом, без картинки
+    reply.content = VIDEO_UNSUPPORTED; reply.reasoning = ''; reply.error = false; return true;
+  }
+  if (force && isVideoRequest(lu.content)) return false;
+  if (!force && detectImageIntent(lu.content) === 'no' && !(prev && isFollowUp(lu.content))) return false;
+  if (!(await imggenEnabled())) return false;
+  setStatus(refs, { type: 'thinking', text: 'Готовлю запрос для картинки…' });
+  let plan = null;
+  // классификатор+перевод: параллельно Pollinations и выбранная текстовая модель сайта (без ключа), берём первый успешный
+  const siteLLM = async (text, amb, sig, pv) => {
+    const pp = slotProvider('A'), mm = slotModel('A');
+    if (!pp || pp.type === 'local' || pp.keyMode === 'required' || pp.custom || pp.needsProxy || !mm) throw new Error('no site model');
+    const ac2 = new AbortController(); const tm = setTimeout(() => ac2.abort(), 12000); const onA = () => ac2.abort(); if (sig) sig.addEventListener('abort', onA, { once: true });
+    try {
+      let out = '';
+      await generate(pp, { model: mm, messages: [{ role: 'user', content: (amb ? '[ambiguous] ' : '') + text }], system: classifierSystem(pv), temp: 0, maxTokens: 200, key: getKey(pp.id), customUrl: S.customUrl }, { signal: ac2.signal, maxWaitMs: 3000, maxAttempts: 1, onDelta: t => { out += t; } });
+      return parseClassifier(out);
+    } finally { clearTimeout(tm); if (sig) sig.removeEventListener('abort', onA); }
+  };
+  try { plan = force && force.prompt ? { prompt: force.prompt } : await planImage(lu.content, { signal, prev, force: !!force, llm: firstOf([askPollinations, siteLLM]) }); }
+  finally { setStatus(refs, { type: 'clear' }); }
+  if (!plan) return false;
+  reply.content = '🎨 Картинка по запросу: «' + lu.content.trim().slice(0, 300) + '»'; reply.reasoning = ''; reply.error = false;
+  reply.image = { url: imageUrl(plan.prompt), prompt: plan.prompt };
+  reply.label = 'Картинка · Pollinations'; reply.prov = 'pollinations'; reply.model = 'image';
+  const nm = refs.wrap.querySelector('.name'); if (nm) nm.textContent = reply.label;
+  return true;
+}
+
 async function runSlot(slot, userText, { regenerate = false, images = null } = {}) {
   const s = state.slots[slot]; const msgs = slotMsgs(slot);
   let p = slotProvider(slot); let model = slotModel(slot);
@@ -506,13 +552,14 @@ async function runSlot(slot, userText, { regenerate = false, images = null } = {
   const reply = { role: 'assistant', content: '', reasoning: '', label: mk(p, model), ts: Date.now(), _streaming: true, prov: p.id, model };
   msgs.push(reply);
   const refs = appendMsg(slot, msgs.length - 1);
+  refs.onImageUrl = () => persistSoon();
   refs.m = reply; paintMsg(refs, true);
   refreshActions(slot);
   scrollDown(slot, true); if (boxes[slot]._jump) boxes[slot]._jump.hidden = true;
   s.busy = true; busyUI();
   const ac = new AbortController(); s.abort = ac;
   let raf = 0, lastPaint = 0;
-  const paint = () => { raf = 0; lastPaint = performance.now(); paintMsg(refs, true); scrollDown(slot); };
+  const paint = () => { raf = 0; if (!reply._streaming) return; lastPaint = performance.now(); paintMsg(refs, true); scrollDown(slot); };   // поздний кадр после завершения не должен вернуть «курсор»
   const schedule = () => { if (raf) return; const wait = Math.max(0, 70 - (performance.now() - lastPaint)); raf = setTimeout(() => requestAnimationFrame(paint), wait); };
   const t0 = performance.now();
   const hist = msgs.slice(0, -1);
@@ -525,13 +572,13 @@ async function runSlot(slot, userText, { regenerate = false, images = null } = {
       for (const x of messages) delete x.images;
     }
     if (trimmed) toast(`Старые сообщения (${trimmed}) не вошли в контекст модели`, { ms: 3500 });
-    if (pp.keyMode === 'required' && !getKey(pp.id)) { const { HttpError } = await import('./api.js'); throw new HttpError(401, ''); }
+    if (pp.keyMode === 'required' && !getKey(pp.id)) { const { HttpError } = await import('./api.js?v=3.9'); throw new HttpError(401, ''); }
     if (pp.custom && !S.customUrl.trim()) throw new Error('Укажите Base URL эндпоинта в блоке «Свой ключ».');
     if (pp.needsProxy && !baseOf(pp)) throw new Error('Для «' + pp.name + '» нужен свой CORS-прокси: разверните proxy/worker.js и укажите адрес в «Настройки → CORS-прокси».');
     if (!mm) throw new Error('Не выбрана модель.');
     reply.content = ''; reply.reasoning = '';
     const r = await generate(pp, {
-      model: mm, messages, system: (document.getElementById('systemPrompt').value || '').trim(), temp: S.temp, maxTokens: S.maxTokens || 0, key: getKey(pp.id), customUrl: S.customUrl
+      model: mm, messages, system: [(document.getElementById('systemPrompt').value || '').trim(), slot === 'A' && imggenOn && pp.type !== 'local' ? IMAGE_SYSTEM_HINT : ''].filter(Boolean).join('\n\n'), temp: S.temp, maxTokens: S.maxTokens || 0, key: getKey(pp.id), customUrl: S.customUrl
     }, {
       signal: ac.signal, maxWaitMs,
       onDelta: t => { reply.content += t; schedule(); },
@@ -542,10 +589,18 @@ async function runSlot(slot, userText, { regenerate = false, images = null } = {
     return r;
   };
   try {
-    try {
+    if (await tryImage(slot, hist, reply, refs, ac.signal)) { ok = true; } else try {
       tried.push(p.id + '|' + model);
       await attemptWith(p, model, { maxWaitMs: S.autoFallback && p.type !== 'local' && S.compare === false ? 25000 : (S.autoFallback && p.type !== 'local' ? 40000 : undefined) });
       ok = true;
+      // страховка: модель ответила маркером [[IMAGE: …]] или отказом «не могу создавать изображения» на картиночный запрос → рисуем
+      { const lu = [...hist].reverse().find(m => m.role === 'user'); const mk = imageMarker(reply.content);
+        const wants = !isVideoRequest(lu && lu.content) && (detectImageIntent(lu && lu.content) !== 'no' || (prevImgPrompt(hist) && isFollowUp(lu && lu.content)));   // маркер/отказ — только если пользователь правда просил картинку
+        if (lu && wants && (mk || isImageRefusal(reply.content))) {
+          const saved = { content: reply.content, label: reply.label };
+          if (!(await tryImage(slot, hist, reply, refs, ac.signal, { prompt: mk }))) { reply.content = mk ? saved.content.replace(/\[\[\s*IMAGE[\s\S]*?\]\]/i, '').trim() || 'Не удалось подготовить картинку.' : saved.content; }
+        } else if (mk) { reply.content = reply.content.replace(/\[\[\s*IMAGE[\s\S]*?\]\]/gi, '').trim() || 'Похоже, вы не просили картинку — уточните, пожалуйста, вопрос.'; }
+        }
     } catch (e) {
       if (e.name === 'AbortError') throw e;
       lastErr = e;
@@ -591,6 +646,18 @@ async function runSlot(slot, userText, { regenerate = false, images = null } = {
     if (reply.error && slot === 'A') showBanner('');
   }
   return ok;
+}
+
+async function downloadImage(m, btn) {
+  const url = m.image && m.image.url; if (!url) return;
+  btn.disabled = true;
+  try {
+    const r = await fetch(url, { credentials: 'omit' }); if (!r.ok) throw new Error('HTTP ' + r.status);
+    const b = await r.blob(); const a = document.createElement('a');
+    a.href = URL.createObjectURL(b); a.download = 'aihub-' + (m.image.prompt || 'image').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40).replace(/^-|-$/g, '') + '.jpg';
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  } catch { window.open(url, '_blank', 'noopener'); }
+  finally { btn.disabled = false; }
 }
 
 let sending = false;
@@ -694,6 +761,33 @@ async function copyText(t, btn) {
   if (btn) { const o = btn.innerHTML; btn.classList.add('done'); const sp = btn.querySelector('span'); if (sp) { const ot = sp.textContent; sp.textContent = 'Скопировано'; setTimeout(() => { sp.textContent = ot; btn.classList.remove('done'); }, 1200); } else { btn.textContent = 'скопировано ✓'; setTimeout(() => { btn.innerHTML = o; btn.classList.remove('done'); }, 1200); } }
 }
 
+/* ============================== поделиться диалогом ============================== */
+// Ссылка создаётся на бэкенде (через _worker.js того же домена): POST /api/share → {id}; просмотр — /s/<id>.
+let sharing = false;
+async function shareChat() {
+  if (sharing) return;
+  const c = state.chat; const messages = shareMessages(c);
+  if (!messages.length) { toast('Чат пуст — нечем делиться', { kind: 'err' }); return; }
+  if (isBusy()) { toast('Дождитесь окончания ответа', { kind: 'err' }); return; }
+  const ok = await confirmDialog({ title: 'Поделиться диалогом?', ok: 'Создать ссылку',
+    html: '<p>Будет создана публичная ссылка: этот диалог (текст сообщений и названия моделей) увидит <b>любой, у кого есть ссылка</b>.</p><p>Не публикуйте личные данные, пароли и ключи. Загруженные вами картинки не передаются (сгенерированные — передаются ссылкой).</p>' });
+  if (!ok) return;
+  sharing = true; $('shareBtn').disabled = true;
+  try {
+    const title = c.title || chatTitleFrom((messages.find(m => m.role === 'user') || messages[0]).content);
+    let r;
+    try { r = await fetch('/api/share', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'omit', body: JSON.stringify({ title, messages }) }); }
+    catch { throw new Error('Сервер недоступен — не удалось создать ссылку'); }
+    let data = null; try { data = await r.json(); } catch { /* */ }
+    if (!r.ok || !data || !data.id) throw new Error((data && data.error) || (r.status === 404 ? 'Функция недоступна на этом адресе сайта' : 'Не удалось создать ссылку (ошибка ' + r.status + ')'));
+    const url = location.origin + '/s/' + data.id;
+    await copyText(url);
+    if (isMobile() && navigator.share) { try { await navigator.share({ title: title + ' — Free AI Hub', text: 'Диалог с нейросетью в Free AI Hub', url }); } catch { /* пользователь закрыл окно */ } }
+    toast('Ссылка скопирована: ' + url, { ms: 4500 });
+  } catch (e) { toast(e.message, { kind: 'err', ms: 4500 }); }
+  finally { sharing = false; $('shareBtn').disabled = false; }
+}
+
 /* ============================== проверка доступности ============================== */
 let checking = false; let checkAbort = null;
 async function runCheck(pids, progId, label) {
@@ -763,6 +857,7 @@ function bind() {
   // чаты
   $('newChatBtn').onclick = newChatAction;
   $('clearBtn').onclick = clearChat;
+  $('shareBtn').onclick = shareChat;
   el.chatSearch.oninput = debounce(renderChatList, 120);
   el.chatList.onclick = async e => {
     const li = e.target.closest('.chat-item'); if (!li) return; const id = li.dataset.id;
@@ -825,6 +920,7 @@ function bind() {
     else if (act.dataset.act === 'regen') regenerate(slot);
     else if (act.dataset.act === 'edit') editLast();
     else if (act.dataset.act === 'tts') speak(m, act);
+    else if (act.dataset.act === 'dl') downloadImage(m, act);
     else if (act.dataset.act === 'cont') send('Продолжи ответ с того места, где остановился. Не повторяй уже написанное.');
   });
 
@@ -873,7 +969,7 @@ async function init() {
   if (!local) { const p = pById('local'); p.hint += ' (Ваш браузер не поддерживает Web Workers/WASM.)'; }
   await afterProviderChange();
   if (S.provider === 'custom' && !S.customUrl) showBanner('Укажите Base URL своего эндпоинта в блоке «Свой ключ».');
-  else if (state.lists[S.provider] && state.lists[S.provider].error) showBanner(state.lists[S.provider].error);
+  else if (state.lists[S.provider] && state.lists[S.provider].error && !state.lists[S.provider].quiet) showBanner(state.lists[S.provider].error);
   renderAll();
   // фоновая прогрев-загрузка списков остальных бесключевых провайдеров (только GET списков, без чат-запросов)
   setTimeout(() => { for (const p of PROVIDERS.filter(x => x.group === 'keyless' && !x.noModelsEndpoint)) if (!state.lists[p.id]) loadList(p.id).then(() => renderSlotCard('A')); }, 1500);

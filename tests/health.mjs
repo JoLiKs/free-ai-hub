@@ -8,9 +8,9 @@
  *   node tests/health.mjs --json out.json     — сохранить результат
  * Код возврата 0 всегда, если хотя бы одна модель отвечает (для CI можно добавить --strict). */
 import { writeFileSync } from 'node:fs';
-import { PROVIDERS } from '../js/providers.js';
-import { fetchLive, staticModels, checkModel, checkProvider } from '../js/models.js';
-import { makeMemoryStore } from '../js/store.js';
+import { PROVIDERS } from '../js/providers.js?v=3.9';
+import { fetchLive, staticModels, checkModel, checkProvider } from '../js/models.js?v=3.9';
+import { makeMemoryStore } from '../js/store.js?v=3.9';
 
 const args = process.argv.slice(2);
 const opt = (n, d) => { const i = args.indexOf('--' + n); return i < 0 ? d : (args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : true); };

@@ -1,7 +1,7 @@
 /* Необязательный service worker: «сначала сеть, при её отсутствии — кэш». Нужен, чтобы приложение открывалось офлайн
  * (например, вместе с локальной моделью, уже скачанной в браузер). API-запросы к провайдерам и любые кросс-доменные запросы
  * (в т.ч. реклама Google: pagead2.googlesyndication.com, googleads.g.doubleclick.net) он НЕ перехватывает и не кэширует. */
-const CACHE = 'fah-v2-shell-2.5-log';
+const CACHE = 'fah-v2-shell-3.9-imgintent';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil((async () => {
   for (const k of await caches.keys()) if (k !== CACHE) await caches.delete(k);
@@ -10,11 +10,15 @@ self.addEventListener('activate', e => e.waitUntil((async () => {
 self.addEventListener('fetch', e => {
   const r = e.request; const u = new URL(r.url);
   if (r.method !== 'GET' || u.origin !== location.origin) return;      // только файлы самого приложения (чужие домены — мимо SW)
-  if (u.pathname.endsWith('/ads.txt')) return;                        // ads.txt всегда напрямую с сервера
+  if (u.pathname === '/admin' || u.pathname.startsWith('/admin/') || u.pathname.startsWith('/api/admin')) return;   // админка: мимо SW (никакого кэша)
+  if (u.pathname === '/buy' || u.pathname.startsWith('/buy/')) return;
+  if (u.pathname.startsWith('/s/') || u.pathname === '/share' || u.pathname.startsWith('/share/')) return;   // общий диалог: мимо SW (никогда не отдаём вместо него чат)   // страница покупки: мимо SW (никогда не отдаём вместо неё чат)
+  if (u.pathname.startsWith('/ads/')) return;   // рекламные iframe-страницы — мимо SW
+  if (u.pathname.endsWith('/ads.txt') || u.pathname.startsWith('/api/')) return;   // ads.txt и /api/* (site-config) — всегда напрямую                        // ads.txt всегда напрямую с сервера
   e.respondWith((async () => {
     const cache = await caches.open(CACHE);
     try {
-      const res = await fetch(r);
+      const res = await fetch(r, { cache: 'no-cache' });   // всегда перепроверяем у сервера (HTTP-кэш браузера не подсовывает старые CSS/JS)
       if (res.ok && res.type === 'basic') cache.put(r, res.clone());
       return res;
     } catch (err) {

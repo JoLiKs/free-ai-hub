@@ -1,6 +1,7 @@
+import { safeImageUrl } from './imggen.js?v=3.9';
 /* История чатов в localStorage: индекс + отдельная запись на чат. Экспорт Markdown/JSON, импорт. */
-import { store as defaultStore } from './store.js';
-import { uid, slug } from './util.js';
+import { store as defaultStore } from './store.js?v=3.9';
+import { uid, slug } from './util.js?v=3.9';
 
 const MAX_CHATS = 200;
 
@@ -90,3 +91,18 @@ export function exportMarkdown(chat) {
   return lines.join('\n');
 }
 export const exportName = (chat, ext) => `free-ai-hub-${slug(chat.title || 'chat')}.${ext}`;
+
+/* ---------- «Поделиться диалогом» ---------- */
+/** Текстовые сообщения чата для публичной ссылки: {role, content, model?}; ошибки/незавершённые/пустые — пропускаются. */
+export function shareMessages(chat) {
+  return ((chat && chat.msgs) || []).filter(m => m && (m.role === 'user' || m.role === 'assistant') && !m.error && !m._streaming && typeof m.content === 'string' && m.content.trim())
+    .slice(-100).map(m => (m.role === 'assistant' ? Object.assign({ role: 'assistant', content: m.content, model: String(m.label || '') }, m.image && safeImageUrl(m.image.url) ? { image: m.image.url, prompt: String(m.image.prompt || '').slice(0, 400) } : {}) : { role: 'user', content: m.content }));
+}
+/** Диалог по ссылке → новый локальный чат (только проверенные поля). Возвращает созданный чат. */
+export function chatFromShared(data) {
+  const msgs = (data && Array.isArray(data.messages) ? data.messages : [])
+    .filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+    .map(m => (m.role === 'assistant' ? Object.assign({ role: 'assistant', content: m.content, label: typeof m.model === 'string' && m.model ? m.model : 'Модель', ts: 0 }, safeImageUrl(m.image) ? { image: { url: m.image, prompt: typeof m.prompt === 'string' ? m.prompt.slice(0, 400) : '' } } : {}) : { role: 'user', content: m.content, ts: 0 }));
+  const title = typeof (data && data.title) === 'string' && data.title.trim() ? data.title.trim().slice(0, 120) : chatTitleFrom(msgs[0] ? msgs[0].content : '');
+  return newChat({ title, msgs });
+}

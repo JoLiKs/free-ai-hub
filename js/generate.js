@@ -1,8 +1,8 @@
 /* Единая точка генерации: облачные провайдеры (api.js) и модель в браузере (local.js). */
-import { chat, HttpError } from './api.js';
-import { generateLocal } from './local.js';
-import { estimateTokens } from './util.js';
-import { limiterFor } from './limiter.js';
+import { chat, HttpError } from './api.js?v=3.9';
+import { generateLocal } from './local.js?v=3.9';
+import { estimateTokens } from './util.js?v=3.9';
+import { limiterFor } from './limiter.js?v=3.9';
 
 const stripThink = s => String(s || '').replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim();
 
@@ -32,8 +32,9 @@ async function runLocal(p, opts, cb) {
     const msgs = (opts.system ? [{ role: 'system', content: opts.system }] : []).concat(opts.messages);
     const r = await generateLocal(opts.model, msgs, {
       maxTokens: opts.maxTokens || 512, temp: opts.temp, signal: cb.signal,
+      size: ((p.staticModels || []).find(x => x.id === opts.model) || {}).size || 0,
       onDelta: t => { if (!started) { started = true; cb.onStatus && cb.onStatus({ type: 'clear' }); } cb.onDelta && cb.onDelta(t); },
-      onProgress: pr => cb.onStatus && cb.onStatus({ type: 'progress', loaded: pr.loaded, total: pr.total })
+      onProgress: pr => { if (!started) cb.onStatus && cb.onStatus({ type: 'progress', stage: pr.stage || 'download', loaded: pr.loaded || 0, total: pr.total || 0, device: pr.device || '' }); }
     });
     cb.onStatus && cb.onStatus({ type: 'clear' });
     if (!r.content.trim()) throw new Error('Модель вернула пустой ответ.');

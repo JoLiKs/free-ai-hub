@@ -1,6 +1,7 @@
 /* Отрисовка сообщений: аватары, пузыри, блок «Размышления», статус, действия. */
-import { esc, fmtTime, estimateTokens } from './util.js';
-import { renderMarkdown, splitThink } from './markdown.js';
+import { esc, fmtTime, estimateTokens } from './util.js?v=3.9';
+import { renderMarkdown, splitThink } from './markdown.js?v=3.9';
+import { safeImageUrl, parseImageUrl, imageUrl, PAID_IMG_RE } from './imggen.js?v=3.9';
 
 const ICON = {
   copy: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>',
@@ -8,6 +9,7 @@ const ICON = {
   edit: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
   cont: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
   tts: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L12 19V5L7.5 9.5z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>',
+  dl: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
   del: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14M10 11v6M14 11v6M7 7l1 12h8l1-12M9 7V4h6v3"/></svg>'
 };
 const AVATAR_USER = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>';
@@ -53,8 +55,9 @@ export function paintActions(refs, busy) {
     if (canEdit && !busy) h += actionBtn('edit', 'Изменить');
   } else {
     if (!(m._streaming)) {
-      if (!m.error) h += actionBtn('copy', 'Копировать', ' data-what="msg"');
-      if (!m.error && typeof speechSynthesis !== 'undefined') h += actionBtn('tts', 'Озвучить');
+      if (!m.error && m.image) h += actionBtn('dl', 'Скачать');
+      if (!m.error && !m.image) h += actionBtn('copy', 'Копировать', ' data-what="msg"');
+      if (!m.error && !m.image && typeof speechSynthesis !== 'undefined') h += actionBtn('tts', 'Озвучить');
       if (canRegen && !busy) h += actionBtn('regen', m.error ? 'Повторить' : 'Заново');
       if (canRegen && !busy && !m.error && m.finish === 'length') h += actionBtn('cont', 'Продолжить');
     }
@@ -94,7 +97,7 @@ export function paintMsg(refs, streaming) {
   }
   const sp = splitThink(m.content);
   const reasoning = ((m.reasoning || '') + (sp.thinking ? (m.reasoning ? '\n\n' : '') + sp.thinking : '')).trim();
-  const answer = sp.answer;
+  const answer = sp.answer.replace(/\[\[\s*IMAGE\b[\s\S]*?(?:\]\]|$)/i, '');   // маркер для генерации картинки не показываем
   if (reasoning) {
     think.hidden = false;
     refs.thinkBody.innerHTML = renderMarkdown(reasoning);
@@ -103,6 +106,8 @@ export function paintMsg(refs, streaming) {
     think.classList.toggle('live', thinkingNow);
     if (!refs.userToggled) { refs._programmatic = true; think.open = thinkingNow; setTimeout(() => { refs._programmatic = false; }, 0); }
   } else think.hidden = true;
+  const imgUrl = m.image && safeImageUrl(m.image.url);
+  if (imgUrl) { paintImage(bubble, imgUrl, m.image.prompt || '', { onUrl: u => { m.image.url = u; bubble.dataset.img = u; if (refs.onImageUrl) refs.onImageUrl(u); } }); bubble.classList.remove('cursor', 'empty'); if (!streaming) { paintActions(refs, false); paintMeta(refs); } return; }
   if (answer.trim()) bubble.innerHTML = renderMarkdown(answer);
   else bubble.innerHTML = streaming ? '<span class="typing" aria-label="Модель печатает"><i></i><i></i><i></i></span>' : (reasoning ? '<span class="muted">Модель пока не дала ответ.</span>' : '');
   bubble.classList.toggle('cursor', !!streaming && !!answer.trim());
@@ -110,14 +115,116 @@ export function paintMsg(refs, streaming) {
   if (!streaming) { paintActions(refs, false); paintMeta(refs); }
 }
 
+/** Картинка в пузыре: заглушка «рисуем…», загрузка напрямую с Pollinations (crossOrigin → проверка пикселей),
+ * распознавание «жёлтой заглушки» Pollinations, до 3 попыток с новым seed (паузы 5/12 с, общий лимит 90 с), затем понятная ошибка
+ * с кнопкой повтора. onUrl(url) — когда удачной оказалась ссылка с другим seed (сохраняем её в историю). Используется и на /s/<id>. */
+export function paintImage(bubble, url, prompt, { onUrl } = {}) {
+  if (bubble.dataset.img === url) return;
+  bubble.dataset.img = url; bubble.classList.add('has-img');
+  const fig = document.createElement('figure'); fig.className = 'gen-img loading';
+  const ph = document.createElement('div'); ph.className = 'gen-ph';
+  const img = new Image(); img.alt = prompt ? 'Сгенерированная картинка: ' + prompt : 'Сгенерированная картинка'; img.decoding = 'async'; img.referrerPolicy = 'no-referrer'; img.crossOrigin = 'anonymous';   // Pollinations отдаёт CORS * → можно проверить пиксели на «заглушку»
+  img.width = 1024; img.height = 1024;
+  const cap = document.createElement('figcaption'); cap.textContent = prompt;
+  const link = document.createElement('a'); link.href = url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.appendChild(img);
+  fig.append(ph, link, cap);
+  bubble.textContent = ''; bubble.appendChild(fig);
+  let cur = url, attempt = 0, t0 = 0, wd = 0, done = false;
+  const setPh = (html) => { ph.innerHTML = html; };
+  const loadingPh = n => setPh('<span class="spin" aria-hidden="true"></span><span>' + (n ? 'Сервис генерации занят — пробуем ещё раз (' + (n + 1) + '/3)…' : 'Рисуем картинку… обычно 5–30 секунд') + '</span>');
+  const finish = () => { done = true; clearTimeout(wd); fig.classList.remove('loading', 'err'); ph.remove(); link.href = shown; if (shown !== url && onUrl) onUrl(shown); };
+  const giveUp = () => {
+    done = true; clearTimeout(wd); fig.classList.remove('loading'); fig.classList.add('err');
+    setPh('<span aria-hidden="true">⚠</span><span>Сервис генерации картинок сейчас перегружен — попробуйте через минуту.</span><button type="button" class="gen-retry">Попробовать ещё раз</button>');
+    if (!ph.isConnected) fig.prepend(ph);
+    ph.querySelector('.gen-retry').onclick = () => { fig.classList.remove('err'); fig.classList.add('loading'); start(true); };
+  };
+  const freeOf = u => (PAID_IMG_RE.test(u) && prompt ? imageUrl(prompt) : u);
+  const retry = () => {
+    if (done) return; clearTimeout(wd);
+    attempt++;
+    const left = 90000 - (Date.now() - t0);
+    if (attempt >= 3 || left < 8000) return giveUp();
+    // картинка с нашего сервера не догрузилась/битая — сначала тот же файл ещё раз (без новой платной генерации)
+    if (PAID_IMG_RE.test(shown) && attempt < 3) {
+      loadingPh(attempt);
+      setTimeout(() => { if (done) return; clearTimeout(wd); wd = setTimeout(retry, 30000); img.src = shown + '?r=' + attempt; }, 1500);
+      return;
+    }
+    loadingPh(attempt);
+    setTimeout(() => { if (!done) { cur = withSeed(freeOf(url), Math.floor(Math.random() * 1e9)); go(); } }, attempt === 1 ? 5000 : 12000);
+  };
+  let shown = url, tok = 0;
+  const go = async () => {
+    clearTimeout(wd); const my = ++tok;
+    // платный режим (ключ задан в админке): наш сервер генерирует и кэширует /api/img/<id>; при любой ошибке — бесплатная прямая ссылка
+    let src = cur;
+    if (!PAID_IMG_RE.test(cur) && await paidOn()) { const p = await paidUrl(cur); if (my !== tok || done) return; if (p) src = p; }
+    if (my !== tok || done) return;
+    wd = setTimeout(retry, Math.min(40000, Math.max(5000, 90000 - (Date.now() - t0))));
+    shown = src; img.src = src;
+  };
+  img.onload = () => { if (done) return; if (img.naturalWidth < 64 || img.naturalHeight < 64 || isPlaceholder(img)) return retry(); finish(); };
+  img.onerror = () => { if (!done) retry(); };
+  const start = (fresh) => { done = false; attempt = 0; t0 = Date.now(); if (fresh) cur = withSeed(freeOf(url), Math.floor(Math.random() * 1e9)); loadingPh(0); if (!ph.isConnected) fig.prepend(ph); go(); };
+  start(false);
+}
+function withSeed(u, seed) {
+  if (PAID_IMG_RE.test(u)) return u;   // кэш сервера: seed не меняется (повтор → бесплатная ссылка через freeOf)
+ return /[?&]seed=\d+/.test(u) ? u.replace(/([?&]seed=)\d+/, '$1' + seed) : u + (u.includes('?') ? '&' : '?') + 'seed=' + seed; }
+// Прокси через свой Cloudflare-домен не используем: Pollinations отвечает 402 на запросы из дата-центров Cloudflare.
+let paidDead = false;
+async function paidOn() {
+  if (paidDead || location.protocol !== 'https:') return false;
+  try { const c = await Promise.race([window.FAH_SITE_CONFIG || Promise.resolve({}), new Promise(r => setTimeout(() => r({}), 1500))]); return !!(c && c.imggen_paid); } catch { return false; }
+}
+async function paidUrl(u) {
+  const q = parseImageUrl(u); if (!q || !q.prompt) return '';
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 50000);
+  try {
+    const r = await fetch('/api/img', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(q), credentials: 'omit', signal: ctl.signal });
+    const j = await r.json().catch(() => null);
+    if (r.ok && j && typeof j.url === 'string' && PAID_IMG_RE.test(j.url)) return j.url;
+    if (j && (j.error === 'off' || j.error === 'auth' || j.error === 'quota' || j.error === 'paid off')) paidDead = true;   // ключ не работает — до перезагрузки только бесплатный режим
+    return '';
+  } catch { return ''; } finally { clearTimeout(t); }
+}
+/** «Жёлтая заглушка» Pollinations: почти однотонный жёлтый фон (+ чёрный логотип). Холст доступен только для своего домена. */
+export function isPlaceholder(img) {
+  try {
+    const W = 24, c = document.createElement('canvas'); c.width = W; c.height = W;
+    const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0, W, W);
+    const d = x.getImageData(0, 0, W, W).data; let yellow = 0, dark = 0, n = W * W;
+    for (let i = 0; i < d.length; i += 4) { const r = d[i], g = d[i + 1], b = d[i + 2];
+      if (r > 200 && g > 165 && b < 140 && r - b > 90) yellow++; else if (r + g + b < 120) dark++; }
+    return yellow / n > 0.6 && yellow / n + dark / n > 0.85;
+  } catch { return false; }   // холст недоступен (нет CORS) — проверить нельзя
+}
+
 export function setStatus(refs, s) {
   const st = refs.status;
-  if (!s || s.type === 'clear') { st.hidden = true; st.innerHTML = ''; st.className = 'status'; return; }
-  st.hidden = false; st.className = 'status ' + (s.type || '');
+  if (!s || s.type === 'clear') { st.hidden = true; st.innerHTML = ''; st.className = 'status'; st.style.cssText = ''; if (refs.bubble) refs.bubble.style.display = ''; return; }
+  if (s.type !== 'progress') { st.style.cssText = ''; if (refs.bubble) refs.bubble.style.display = ''; }
+  st.hidden = false; st.className = 'status ' + (s.type === 'progress' ? 'loadprog' : (s.type || ''));
   let inner = '';
   if (s.type === 'progress') {
-    const pct = s.total ? Math.min(100, Math.round(s.loaded / s.total * 100)) : 0;
-    inner = `<span>Загрузка модели в браузер… ${s.total ? pct + '% (' + Math.round(s.loaded / 1e6) + ' из ' + Math.round(s.total / 1e6) + ' МБ)' : ''}</span><span class="pbar"><i style="width:${pct}%"></i></span>`;
+    const stage = s.stage || 'download';
+    const dev = s.device === 'webgpu' ? 'WebGPU' : s.device === 'wasm' ? 'WASM/CPU' : '';
+    const mb = n => (n / 1048576).toFixed(n < 10485760 ? 1 : 0).replace('.', ',');
+    const det = stage === 'download' && s.total > 0;
+    // общий % по всем файлам; монотонный (новый файл может увеличить total — шкала назад не прыгает); <10% — с десятой
+    let pct = det ? Math.min(100, s.loaded / s.total * 100) : 0;
+    if (det) { refs._pct = Math.max(refs._pct || 0, pct); pct = refs._pct; }
+    const pctTxt = pct < 10 ? pct.toFixed(1).replace('.', ',') : String(Math.floor(pct));
+    const title = { lib: 'Загружаем библиотеку transformers.js…', download: 'Скачиваем модель в браузер', init: 'Инициализация модели' + (dev ? ' (' + dev + ')' : '') + '…', fallback: 'WebGPU не справился — переключаемся на WASM…', prefill: 'Модель обдумывает ответ' + (dev ? ' (' + dev + ')' : '') + '…' }[stage] || 'Загрузка модели…';
+    const meta = det ? `<b>${pctTxt}%</b> · ${mb(s.loaded)} из ${mb(s.total)} МБ` : (stage === 'download' && s.loaded ? mb(s.loaded) + ' МБ' : '');
+    st.className = 'status loadprog';
+    // критичная раскладка — инлайном: блок корректен даже при устаревшем style.css в кэше браузера
+    st.style.cssText = 'display:flex;flex-direction:column;align-items:stretch;gap:8px;height:auto;max-height:none;overflow:visible;width:min(100%,460px);padding:10px 14px;box-sizing:border-box';
+    st.innerHTML = `<div class="lp-row" style="display:flex;align-items:center;gap:8px;min-width:0;line-height:1.45"><span class="spin" aria-hidden="true"></span><span class="lp-title" style="flex:1;min-width:0">${esc(title)}</span><span class="lp-meta" style="white-space:nowrap;font-variant-numeric:tabular-nums">${meta}</span></div><span class="pbar${det ? '' : ' indet'}" role="progressbar" aria-valuemin="0" aria-valuemax="100"${det ? ` aria-valuenow="${Math.floor(pct)}"` : ''} style="display:block;flex:none;width:100%;min-width:0;height:6px"><i style="width:${det ? pct.toFixed(1) : 100}%"></i></span>`;
+    // пустой пузырь с «точками» во время загрузки не показываем (JS, не только CSS :has)
+    if (refs.bubble && refs.bubble.querySelector('.typing')) refs.bubble.style.display = 'none';
+    return;
   } else {
     const spin = (s.type === 'wait' || s.type === 'retry' || s.type === 'slow' || s.type === 'thinking') ? '<span class="spin" aria-hidden="true"></span>' : '';
     inner = spin + `<span>${esc(s.text || '')}</span>`;

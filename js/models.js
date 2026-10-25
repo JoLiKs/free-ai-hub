@@ -1,8 +1,8 @@
 /* Списки моделей (кэш с TTL, «устаревшее показываем сразу — обновляем в фоне»),
  * проверка доступности («живая проверка») и избранное. */
-import { store as defaultStore } from './store.js';
-import { authHeaders, baseOf, httpError, explainError, HttpError, TimeoutError, chat } from './api.js';
-import { limiterFor } from './limiter.js';
+import { store as defaultStore } from './store.js?v=3.9';
+import { authHeaders, baseOf, httpError, explainError, HttpError, TimeoutError, chat } from './api.js?v=3.9';
+import { limiterFor } from './limiter.js?v=3.9';
 
 export const MODELS_TTL = 6 * 3600e3;
 export const HEALTH_FRESH = 30 * 60e3;     // «свежая» проверка
@@ -28,7 +28,8 @@ const cacheKey = (p, key, customUrl) => 'models.' + p.id + (p.custom ? '.' + (cu
 
 export async function fetchLive(p, { key, customUrl, fetchImpl, signal } = {}) {
   const f = fetchImpl || fetch;
-  const res = await f(modelsUrlFor(p, customUrl), { headers: authHeaders(p, key), signal });
+  let res = await f(modelsUrlFor(p, customUrl), { headers: authHeaders(p, key), signal });
+  if ((res.status === 401 || res.status === 403) && key && p.keyMode !== 'required') res = await f(modelsUrlFor(p, customUrl), { headers: authHeaders(p, ''), signal });   // ключ необязателен — пробуем анонимно
   if (!res.ok) throw await httpError(res);
   const json = await res.json();
   let list = p.parseModels ? p.parseModels(json, key) : (json.data || []).map(m => ({ id: m.id, label: m.id, meta: '' }));
@@ -67,7 +68,9 @@ export async function getModels(p, { key = '', customUrl = '', force = false, st
     return { list, source: 'live', ts: now() };
   } catch (e) {
     const list = (cached && cached.list) ? cached.list.map(m => decorate(p, m)) : fb;
-    return { list, source: cached ? 'cache' : 'static', ts: cached ? cached.ts : 0, error: `Не удалось загрузить список моделей: ${explainError(e, p)}${list.length ? ' Показан ' + (cached ? 'сохранённый' : 'встроенный') + ' список.' : ''}`, stale: true };
+    // есть встроенный/сохранённый список — посетителю баннер не показываем (quiet), подробности — в консоль
+    if (list.length) console.warn('[fah] список моделей ' + p.id + ': ' + explainError(e, p));
+    return { list, source: cached ? 'cache' : 'static', ts: cached ? cached.ts : 0, quiet: list.length > 0, error: `Не удалось загрузить список моделей: ${explainError(e, p)}${list.length ? ' Показан ' + (cached ? 'сохранённый' : 'встроенный') + ' список.' : ''}`, stale: true };
   }
 }
 

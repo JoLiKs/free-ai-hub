@@ -1,6 +1,6 @@
 /* Сетевой слой: запросы к провайдерам, потоковый разбор SSE, «размышления», таймауты, повторы, очередь. */
-import { abortError } from './util.js';
-import { limiterFor, QueueWaitError } from './limiter.js';
+import { abortError } from './util.js?v=3.9';
+import { limiterFor, QueueWaitError } from './limiter.js?v=3.9';
 export { QueueWaitError };
 
 /* ------------------------------ ошибки -------------------------------- */
@@ -138,6 +138,7 @@ export function extractGemini(j) {
 
 /* ----------------------------- запрос ---------------------------------- */
 export function authHeaders(p, key) {
+  if (p.keyMode === 'none') key = '';      // анонимный провайдер (OVH): старый/просроченный ключ из «Свой ключ» не отправляем — иначе 403
   if (!key && p.anonKey) key = p.anonKey;   // публичный анонимный ключ (AI Horde)
   if (!key) return {};
   return p.type === 'gemini' ? { 'x-goog-api-key': key } : { Authorization: 'Bearer ' + key };
@@ -177,7 +178,15 @@ export function buildRequest(p, o) {
 }
 
 /** Один запрос (без повторов). Возвращает { content, reasoning, usage, finish } */
-export async function requestOnce(p, o, { signal, onDelta, onReasoning, headerTimeoutMs = 60000, idleTimeoutMs = 60000, fetchImpl } = {}) {
+export async function requestOnce(p, o, opts = {}) {
+  try { return await requestOnce1(p, o, opts); }
+  catch (e) {
+    // ключ необязателен, а провайдер его отклонил (401/403) — молча повторяем анонимно
+    if (o.key && p.keyMode === 'optional' && e && (e.status === 401 || e.status === 403)) { console.warn('[fah] ключ ' + p.id + ' отклонён, запрос без ключа'); return requestOnce1(p, Object.assign({}, o, { key: '' }), opts); }
+    throw e;
+  }
+}
+async function requestOnce1(p, o, { signal, onDelta, onReasoning, headerTimeoutMs = 60000, idleTimeoutMs = 60000, fetchImpl } = {}) {
   const rq = buildRequest(p, o);
   const ac = new AbortController(); let timedOut = ''; let timer = null;
   const onAbort = () => ac.abort();

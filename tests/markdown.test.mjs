@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { renderMarkdown, renderInline, splitThink } from '../js/markdown.js';
-import { estimateTokens } from '../js/util.js';
+import { renderMarkdown, renderInline, splitThink } from '../js/markdown.js?v=3.9';
+import { estimateTokens } from '../js/util.js?v=3.9';
 let n = 0; const t = (name, fn) => { try { fn(); n++; console.log('  ✓', name); } catch (e) { console.error('  ✗', name, '\n   ', e.message); process.exitCode = 1; } };
 
 t('XSS: script в тексте экранируется', () => { const h = renderMarkdown('<script>alert(1)</script> <img src=x onerror=alert(1)>'); assert.ok(!/<script|<img/i.test(h)); });

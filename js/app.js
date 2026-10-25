@@ -1,19 +1,19 @@
 /* Free AI Hub v2 — точка входа: собирает UI из модулей. Без сборки, без зависимостей. */
-import { esc, sleep, debounce, estimateTokens, fmtAgo, fmtBytes, abortError } from './util.js?v=3.10';
-import { store } from './store.js?v=3.10';
-import { PROVIDERS, pById, FALLBACK_ORDER, SYSTEM_PRESETS, SUGGESTIONS, supportsVision } from './providers.js?v=3.10';
-import { state, saveSettings, saveSettingsNow, saveKeys, getKey, slotPid, slotProvider, slotModel, setSlotModel, slotMsgs, isBusy, modelInfo, modelLabel } from './state.js?v=3.10';
-import { explainError, isFallbackWorthy, setProxy, baseOf } from './api.js?v=3.10';
-import { generate, prepareMessages } from './generate.js?v=3.10';
-import { getModels, staticModels, favs, healthStore, checkProvider, healthLabel, providerSummary, HEALTH_STALE } from './models.js?v=3.10';
-import { ChatStore, newChat, chatTitleFrom, exportMarkdown, exportName, shareMessages } from './chats.js?v=3.10';
-import { $, toast, announce, showBanner, confirmDialog, promptDialog, openPopover, closePopover, popoverOpen, isMobile } from './ui.js?v=3.10';
-import { createMsgNode, paintMsg, paintActions, setStatus, emptyStateNode } from './messages.js?v=3.10';
-import { localSupported, webgpuAvailable } from './local.js?v=3.10';
-import { detectImageIntent, isVideoRequest, isExplicitImageRequest, isCapabilityQuestion, VIDEO_UNSUPPORTED, planImage, imageUrl, isFollowUp, mentionsImage, imageMarker, isImageRefusal, IMAGE_SYSTEM_HINT, askPollinations, firstOf, classifierSystem, parseClassifier } from './imggen.js?v=3.10';
-import { BACKEND_URL, LOG_LOCAL_MODEL, ADSENSE_CLIENT, ADSENSE_SLOT } from './config.js?v=3.10';
-import { createAds, showAdsDialog, ADS_PRIVACY_NOTE } from './ads.js?v=3.10';
-import { createTelemetry } from './telemetry.js?v=3.10';
+import { esc, sleep, debounce, estimateTokens, fmtAgo, fmtBytes, abortError } from './util.js?v=3.11';
+import { store } from './store.js?v=3.11';
+import { PROVIDERS, pById, FALLBACK_ORDER, SYSTEM_PRESETS, SUGGESTIONS, supportsVision } from './providers.js?v=3.11';
+import { state, saveSettings, saveSettingsNow, saveKeys, getKey, slotPid, slotProvider, slotModel, setSlotModel, slotMsgs, isBusy, modelInfo, modelLabel } from './state.js?v=3.11';
+import { explainError, isFallbackWorthy, setProxy, baseOf } from './api.js?v=3.11';
+import { generate, prepareMessages } from './generate.js?v=3.11';
+import { getModels, staticModels, favs, healthStore, checkProvider, healthLabel, providerSummary, HEALTH_STALE } from './models.js?v=3.11';
+import { ChatStore, newChat, chatTitleFrom, exportMarkdown, exportName, shareMessages } from './chats.js?v=3.11';
+import { $, toast, announce, showBanner, confirmDialog, promptDialog, openPopover, closePopover, popoverOpen, isMobile } from './ui.js?v=3.11';
+import { createMsgNode, paintMsg, paintActions, setStatus, emptyStateNode } from './messages.js?v=3.11';
+import { localSupported, webgpuAvailable } from './local.js?v=3.11';
+import { IMAGE_TEXT_HINT, stripMarker, emptyReplyText, detectImageIntent, isVideoRequest, isExplicitImageRequest, isCapabilityQuestion, VIDEO_UNSUPPORTED, planImage, imageUrl, isFollowUp, mentionsImage, imageMarker, isImageRefusal, IMAGE_SYSTEM_HINT, askPollinations, firstOf, classifierSystem, parseClassifier } from './imggen.js?v=3.11';
+import { BACKEND_URL, LOG_LOCAL_MODEL, ADSENSE_CLIENT, ADSENSE_SLOT } from './config.js?v=3.11';
+import { createAds, showAdsDialog, ADS_PRIVACY_NOTE } from './ads.js?v=3.11';
+import { createTelemetry } from './telemetry.js?v=3.11';
 
 const chats = new ChatStore(store);
 // журнал на сервере владельца: включается только если задан BACKEND_URL и пользователь согласился
@@ -565,20 +565,22 @@ async function runSlot(slot, userText, { regenerate = false, images = null } = {
   const hist = msgs.slice(0, -1);
   { const lu = [...hist].reverse().find(m => m.role === 'user'); if (lu && lu.imgN && !(lu._images && lu._images.length) && (regenerate || userText == null)) toast('Изображения из прошлой сессии не сохраняются — модель увидит только текст. Прикрепите их заново.', { kind: 'err', ms: 4500 }); }
   const tried = []; let candidates = null; let lastErr = null; let ok = false;
-  const attemptWith = async (pp, mm, { maxWaitMs } = {}) => {
+  const luMsg = [...hist].reverse().find(m => m.role === 'user');
+  const wantsImg = !!luMsg && (isExplicitImageRequest(luMsg.content) || (!!prevImgPrompt(hist) && isFollowUp(luMsg.content) && !isCapabilityQuestion(luMsg.content)));   // маркер [[IMAGE]] — только при явной просьбе
+  const attemptWith = async (pp, mm, { maxWaitMs, noHint = false } = {}) => {
     const { messages, trimmed } = prepareMessages(hist, pp.ctxBudget || 12000);
     if (!supportsVision(pp, mm)) {
       if (messages.length && messages[messages.length - 1].images) throw new Error('Эта модель не понимает изображения. Выберите модель с поддержкой картинок (например, Qwen2.5-VL у OVHcloud) или уберите вложение.');
       for (const x of messages) delete x.images;
     }
     if (trimmed) toast(`Старые сообщения (${trimmed}) не вошли в контекст модели`, { ms: 3500 });
-    if (pp.keyMode === 'required' && !getKey(pp.id)) { const { HttpError } = await import('./api.js?v=3.10'); throw new HttpError(401, ''); }
+    if (pp.keyMode === 'required' && !getKey(pp.id)) { const { HttpError } = await import('./api.js?v=3.11'); throw new HttpError(401, ''); }
     if (pp.custom && !S.customUrl.trim()) throw new Error('Укажите Base URL эндпоинта в блоке «Свой ключ».');
     if (pp.needsProxy && !baseOf(pp)) throw new Error('Для «' + pp.name + '» нужен свой CORS-прокси: разверните proxy/worker.js и укажите адрес в «Настройки → CORS-прокси».');
     if (!mm) throw new Error('Не выбрана модель.');
     reply.content = ''; reply.reasoning = '';
     const r = await generate(pp, {
-      model: mm, messages, system: [(document.getElementById('systemPrompt').value || '').trim(), slot === 'A' && imggenOn && pp.type !== 'local' ? IMAGE_SYSTEM_HINT : ''].filter(Boolean).join('\n\n'), temp: S.temp, maxTokens: S.maxTokens || 0, key: getKey(pp.id), customUrl: S.customUrl
+      model: mm, messages, system: [(document.getElementById('systemPrompt').value || '').trim(), slot === 'A' && imggenOn && pp.type !== 'local' && !noHint ? (wantsImg ? IMAGE_SYSTEM_HINT : IMAGE_TEXT_HINT) : ''].filter(Boolean).join('\n\n'), temp: S.temp, maxTokens: S.maxTokens || 0, key: getKey(pp.id), customUrl: S.customUrl
     }, {
       signal: ac.signal, maxWaitMs,
       onDelta: t => { reply.content += t; schedule(); },
@@ -593,14 +595,6 @@ async function runSlot(slot, userText, { regenerate = false, images = null } = {
       tried.push(p.id + '|' + model);
       await attemptWith(p, model, { maxWaitMs: S.autoFallback && p.type !== 'local' && S.compare === false ? 25000 : (S.autoFallback && p.type !== 'local' ? 40000 : undefined) });
       ok = true;
-      // страховка: модель ответила маркером [[IMAGE: …]] или отказом «не могу создавать изображения» на картиночный запрос → рисуем
-      { const lu = [...hist].reverse().find(m => m.role === 'user'); const mk = imageMarker(reply.content);
-        const wants = !!lu && (isExplicitImageRequest(lu.content) || (!!prevImgPrompt(hist) && isFollowUp(lu.content) && !isCapabilityQuestion(lu.content)));   // маркер/отказ — только если пользователь правда просил картинку
-        if (lu && wants && (mk || isImageRefusal(reply.content))) {
-          const saved = { content: reply.content, label: reply.label };
-          if (!(await tryImage(slot, hist, reply, refs, ac.signal, { prompt: mk }))) { reply.content = mk ? saved.content.replace(/\[\[\s*IMAGE[\s\S]*?\]\]/i, '').trim() || 'Не удалось подготовить картинку.' : saved.content; }
-        } else if (mk) { reply.content = reply.content.replace(/\[\[\s*IMAGE[\s\S]*?\]\]/gi, '').trim() || 'Похоже, вы не просили картинку — уточните, пожалуйста, вопрос.'; }
-        }
     } catch (e) {
       if (e.name === 'AbortError') throw e;
       lastErr = e;
@@ -620,6 +614,18 @@ async function runSlot(slot, userText, { regenerate = false, images = null } = {
       if (!ok) {
         if (e.name === 'QueueWaitError' && !ac.signal.aborted) { setStatus(refs, { type: 'clear' }); await attemptWith(slotProvider(slot), slotModel(slot)); ok = true; }
         else throw lastErr || e;
+      }
+    }
+    // после любой успешной попытки (основная модель или запасная): маркер [[IMAGE]] / отказ / пустой ответ
+    if (ok && !reply.image) {
+      const mkr = imageMarker(reply.content);
+      if (wantsImg && (mkr || isImageRefusal(reply.content))) {
+        const saved = reply.content;
+        if (!(await tryImage(slot, hist, reply, refs, ac.signal, { prompt: mkr }))) reply.content = stripMarker(saved);
+      } else if (mkr) reply.content = stripMarker(reply.content);
+      if (!reply.image && !reply.content.trim()) {          // пустой текст (модель ответила только маркером) — переспрашиваем без картиночных инструкций
+        try { await attemptWith(p, model, { maxWaitMs: 8000, noHint: true }); reply.content = stripMarker(reply.content); } catch (e3) { if (e3.name === 'AbortError') throw e3; }
+        if (!reply.content.trim()) reply.content = emptyReplyText(luMsg && luMsg.content);
       }
     }
   } catch (e) {

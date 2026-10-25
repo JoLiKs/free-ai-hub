@@ -1,7 +1,7 @@
 /* Состояние приложения: настройки, ключи, активный чат. Без обращений к DOM. */
-import { store } from './store.js?v=3.10';
-import { PROVIDERS, pById } from './providers.js?v=3.10';
-import { newChat } from './chats.js?v=3.10';
+import { store } from './store.js?v=3.11';
+import { PROVIDERS, pById } from './providers.js?v=3.11';
+import { newChat } from './chats.js?v=3.11';
 
 export const DEFAULT_SETTINGS = {
   provider: 'ovh', models: {}, providerB: 'chat', modelB: '', compare: false,

@@ -41,6 +41,7 @@ export function isVideoRequest(text) {
   const t = String(text || '').trim();
   if (!t || t.length > 700 || !VIDEO.test(t)) return false;
   if (/(?:^|\s)(?:как|how)\s/iu.test(t) && !GEN.test(t)) return false;            // «как смонтировать видео» — обычный вопрос
+  if (/\?\s*$/.test(t) && t.split(/\s+/).length <= 4) return true;         // «а видео?», «видео можешь?»
   return GEN.test(t) || DRAW.test(t) || MAKE.test(t) || CAPQ.test(t) || RX(B0 + W('(?:анимируй\\w*|оживи\\w*|сними\\w*|смонтируй\\w*)') + B1 + '|\\banimate\\b').test(t);
 }
 export const VIDEO_UNSUPPORTED = '🎬 Генерировать видео я, к сожалению, не умею — на этом сайте доступны только текстовые ответы и генерация картинок. Могу нарисовать картинку (например, кадр или постер на эту тему), написать сценарий, раскадровку или подсказать сервисы для генерации видео.';
@@ -171,4 +172,14 @@ export function parseImageUrl(u) {
     const num = (k, d) => { const n = parseInt(x.searchParams.get(k), 10); return Number.isFinite(n) ? n : d; };
     return { prompt: prompt.slice(0, 600), seed: Math.abs(num('seed', 0)) % 2147483647, width: num('width', 1024), height: num('height', 1024) };
   } catch { return null; }
+}
+
+/** Для НЕявных сообщений: без маркера, только факты о возможностях сайта. */
+export const IMAGE_TEXT_HINT = 'Справка о сайте: он умеет генерировать картинки, когда пользователь явно попросит (например, «нарисуй кота»). Видео генерировать НЕ умеет. Отвечай обычным текстом; не пиши никаких служебных маркеров в двойных квадратных скобках.';
+export function stripMarker(t) { return String(t || '').replace(/\[\[\s*IMAGE\b[\s\S]*?(?:\]\]|$)/gi, '').trim(); }
+/** Текст вместо пустого ответа. */
+export function emptyReplyText(user) {
+  if (isVideoRequest(user)) return VIDEO_UNSUPPORTED;
+  if (isCapabilityQuestion(user) || mentionsImage(user)) return 'Да, я умею рисовать картинки — напиши, что нарисовать (например: «нарисуй кота в шляпе»). Видео генерировать не умею.';
+  return 'Модель вернула пустой ответ — попробуйте переформулировать вопрос или нажмите «Повторить».';
 }

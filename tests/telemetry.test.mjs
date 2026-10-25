@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { createTelemetry, normalizeBackendUrl, redact, newUuid } from '../js/telemetry.js?v=3.10';
-import { makeMemoryStore } from '../js/store.js?v=3.10';
+import { createTelemetry, normalizeBackendUrl, redact, newUuid } from '../js/telemetry.js?v=3.11';
+import { makeMemoryStore } from '../js/store.js?v=3.11';
 
 let n = 0; const tests = []; const t = (name, fn) => tests.push([name, fn]);
 const mkFetch = (status = 200) => { const calls = []; const f = async (url, init) => { calls.push({ url, init }); return { ok: status < 400, status, json: async () => ({ deleted: 3 }) }; }; f.calls = calls; return f; };

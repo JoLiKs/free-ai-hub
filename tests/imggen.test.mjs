@@ -1,5 +1,5 @@
 // Детектор запросов картинок: 60+ фраз (явные, разговорные, с опечатками, без глагола, EN) + ложные срабатывания + продолжения.
-import { detectImageIntent as d, isVideoRequest, isExplicitImageRequest as ex, isCapabilityQuestion as cq, isFollowUp, isImageRefusal, imageMarker, planImage } from '../js/imggen.js?v=3.10';
+import { stripMarker, emptyReplyText, IMAGE_TEXT_HINT, detectImageIntent as d, isVideoRequest, isExplicitImageRequest as ex, isCapabilityQuestion as cq, isFollowUp, isImageRefusal, imageMarker, planImage } from '../js/imggen.js?v=3.11';
 const YES = [ // ожидаем 'yes' или 'maybe' (идёт на генерацию/классификатор), но НЕ 'no'
   'картинка крысы', 'крыса картинкой', 'нарисуй мне крысу', 'а можешь картинку с крысой?', 'сгенерь крысу', 'фото крысы в шляпе',
   'Сделай картинку с крысой', 'можешь сделать картинку с крысой', 'хочу картинку крысы', 'Давай картинку с крысой', 'создай кртинку крысы',
@@ -62,5 +62,11 @@ const EXPL = ['нарисуй кота', 'Нарисуй мне кота в шл
   'можешь нарисовать крысу?', 'А картинку с крысой можешь?', 'покажи картинку с котом', 'создай логотип для кофейни', 'изобрази город будущего', 'нарисуешь собаку?'];
 for (const t of EXPL) { if (d(t) === 'no') fail('explicit missed:', t); if (!ex(t)) fail('explicit not explicit:', t); }
 for (const t of ['Привет', 'Ты шо прикалуешься', 'что такое нейросеть?', 'сколько стоит фотоаппарат?', 'как дела?']) if (ex(t)) fail('marker would draw:', t);
-const n = CAP.length + EXPL.length + 5 + TEXT_ONLY.length + YES.length + NO.length + FOLLOW.length + NOTFOLLOW.length;
+if (stripMarker('[[IMAGE: Cat playing piano]]') !== '') fail('strip marker');
+if (stripMarker('Вот: [[IMAGE: a cat') !== 'Вот:') fail('strip unclosed marker');
+if (!/умею рисовать/.test(emptyReplyText('а картинки умеешь делать?'))) fail('empty reply capability text');
+if (!/видео/.test(emptyReplyText('а видео?'))) fail('empty reply video text');
+if (!emptyReplyText('привет').trim()) fail('empty reply generic');
+if (/\[\[IMAGE:/.test(IMAGE_TEXT_HINT)) fail('text hint must not teach the marker');
+const n = 6 + CAP.length + EXPL.length + 5 + TEXT_ONLY.length + YES.length + NO.length + FOLLOW.length + NOTFOLLOW.length;
 console.log(bad ? `FAIL ${bad}` : `imggen tests: ${n} phrases OK`); process.exit(bad ? 1 : 0);

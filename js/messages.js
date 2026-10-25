@@ -1,7 +1,7 @@
 /* Отрисовка сообщений: аватары, пузыри, блок «Размышления», статус, действия. */
-import { esc, fmtTime, estimateTokens } from './util.js?v=3.10';
-import { renderMarkdown, splitThink } from './markdown.js?v=3.10';
-import { safeImageUrl, parseImageUrl, imageUrl, PAID_IMG_RE } from './imggen.js?v=3.10';
+import { esc, fmtTime, estimateTokens } from './util.js?v=3.11';
+import { renderMarkdown, splitThink } from './markdown.js?v=3.11';
+import { safeImageUrl, parseImageUrl, imageUrl, PAID_IMG_RE } from './imggen.js?v=3.11';
 
 const ICON = {
   copy: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>',

@@ -1,5 +1,5 @@
 // Детектор запросов картинок: 60+ фраз (явные, разговорные, с опечатками, без глагола, EN) + ложные срабатывания + продолжения.
-import { stripMarker, emptyReplyText, IMAGE_TEXT_HINT, detectImageIntent as d, isVideoRequest, isExplicitImageRequest as ex, isCapabilityQuestion as cq, isFollowUp, isImageRefusal, imageMarker, planImage } from '../js/imggen.js?v=3.11';
+import { capabilityAnswer as ca, stripMarker, emptyReplyText, IMAGE_TEXT_HINT, detectImageIntent as d, isVideoRequest, isExplicitImageRequest as ex, isCapabilityQuestion as cq, isFollowUp, isImageRefusal, imageMarker, planImage } from '../js/imggen.js?v=3.12';
 const YES = [ // ожидаем 'yes' или 'maybe' (идёт на генерацию/классификатор), но НЕ 'no'
   'картинка крысы', 'крыса картинкой', 'нарисуй мне крысу', 'а можешь картинку с крысой?', 'сгенерь крысу', 'фото крысы в шляпе',
   'Сделай картинку с крысой', 'можешь сделать картинку с крысой', 'хочу картинку крысы', 'Давай картинку с крысой', 'создай кртинку крысы',
@@ -68,5 +68,9 @@ if (!/умею рисовать/.test(emptyReplyText('а картинки уме
 if (!/видео/.test(emptyReplyText('а видео?'))) fail('empty reply video text');
 if (!emptyReplyText('привет').trim()) fail('empty reply generic');
 if (/\[\[IMAGE:/.test(IMAGE_TEXT_HINT)) fail('text hint must not teach the marker');
-const n = 6 + CAP.length + EXPL.length + 5 + TEXT_ONLY.length + YES.length + NO.length + FOLLOW.length + NOTFOLLOW.length;
+for (const q of ['умеешь рисовать?', 'а картинки умеешь делать?', 'фотки делаешь?', 'рисуешь?', 'can you draw?', 'изображения генерируешь?', 'а логотипы делаешь?']) if (!/рисова|картин/i.test(ca(q) || '')) fail('canned img missed:', q, ca(q));
+for (const q of ['а видео?', 'видео умеешь?', 'can you make videos?', 'ролики делаешь?']) if (!/видео я не умею/i.test(ca(q) || '')) fail('canned video missed:', q, ca(q));
+for (const q of ['а картинки и видео умеешь?', 'рисуешь и видео делаешь?']) if (!/Видео — нет/.test(ca(q) || '')) fail('canned both missed:', q, ca(q));
+for (const q of ['как сжать картинку?', 'что на этой картинке?', 'нарисуй кота', 'можешь нарисовать кота?', 'Привет', 'как дела?', 'что такое видео?', 'сколько весит фото?', 'что изображено на фото?', 'Ты шо прикалуешься']) if (ca(q)) fail('canned false+:', q);
+const n = 23 + 6 + CAP.length + EXPL.length + 5 + TEXT_ONLY.length + YES.length + NO.length + FOLLOW.length + NOTFOLLOW.length;
 console.log(bad ? `FAIL ${bad}` : `imggen tests: ${n} phrases OK`); process.exit(bad ? 1 : 0);

@@ -1,19 +1,19 @@
 /* Free AI Hub v2 — точка входа: собирает UI из модулей. Без сборки, без зависимостей. */
-import { esc, sleep, debounce, estimateTokens, fmtAgo, fmtBytes, abortError } from './util.js?v=3.11';
-import { store } from './store.js?v=3.11';
-import { PROVIDERS, pById, FALLBACK_ORDER, SYSTEM_PRESETS, SUGGESTIONS, supportsVision } from './providers.js?v=3.11';
-import { state, saveSettings, saveSettingsNow, saveKeys, getKey, slotPid, slotProvider, slotModel, setSlotModel, slotMsgs, isBusy, modelInfo, modelLabel } from './state.js?v=3.11';
-import { explainError, isFallbackWorthy, setProxy, baseOf } from './api.js?v=3.11';
-import { generate, prepareMessages } from './generate.js?v=3.11';
-import { getModels, staticModels, favs, healthStore, checkProvider, healthLabel, providerSummary, HEALTH_STALE } from './models.js?v=3.11';
-import { ChatStore, newChat, chatTitleFrom, exportMarkdown, exportName, shareMessages } from './chats.js?v=3.11';
-import { $, toast, announce, showBanner, confirmDialog, promptDialog, openPopover, closePopover, popoverOpen, isMobile } from './ui.js?v=3.11';
-import { createMsgNode, paintMsg, paintActions, setStatus, emptyStateNode } from './messages.js?v=3.11';
-import { localSupported, webgpuAvailable } from './local.js?v=3.11';
-import { IMAGE_TEXT_HINT, stripMarker, emptyReplyText, detectImageIntent, isVideoRequest, isExplicitImageRequest, isCapabilityQuestion, VIDEO_UNSUPPORTED, planImage, imageUrl, isFollowUp, mentionsImage, imageMarker, isImageRefusal, IMAGE_SYSTEM_HINT, askPollinations, firstOf, classifierSystem, parseClassifier } from './imggen.js?v=3.11';
-import { BACKEND_URL, LOG_LOCAL_MODEL, ADSENSE_CLIENT, ADSENSE_SLOT } from './config.js?v=3.11';
-import { createAds, showAdsDialog, ADS_PRIVACY_NOTE } from './ads.js?v=3.11';
-import { createTelemetry } from './telemetry.js?v=3.11';
+import { esc, sleep, debounce, estimateTokens, fmtAgo, fmtBytes, abortError } from './util.js?v=3.12';
+import { store } from './store.js?v=3.12';
+import { PROVIDERS, pById, FALLBACK_ORDER, SYSTEM_PRESETS, SUGGESTIONS, supportsVision } from './providers.js?v=3.12';
+import { state, saveSettings, saveSettingsNow, saveKeys, getKey, slotPid, slotProvider, slotModel, setSlotModel, slotMsgs, isBusy, modelInfo, modelLabel } from './state.js?v=3.12';
+import { explainError, isFallbackWorthy, setProxy, baseOf } from './api.js?v=3.12';
+import { generate, prepareMessages } from './generate.js?v=3.12';
+import { getModels, staticModels, favs, healthStore, checkProvider, healthLabel, providerSummary, HEALTH_STALE } from './models.js?v=3.12';
+import { ChatStore, newChat, chatTitleFrom, exportMarkdown, exportName, shareMessages } from './chats.js?v=3.12';
+import { $, toast, announce, showBanner, confirmDialog, promptDialog, openPopover, closePopover, popoverOpen, isMobile } from './ui.js?v=3.12';
+import { createMsgNode, paintMsg, paintActions, setStatus, emptyStateNode } from './messages.js?v=3.12';
+import { localSupported, webgpuAvailable } from './local.js?v=3.12';
+import { capabilityAnswer, IMAGE_TEXT_HINT, stripMarker, emptyReplyText, detectImageIntent, isVideoRequest, isExplicitImageRequest, isCapabilityQuestion, VIDEO_UNSUPPORTED, planImage, imageUrl, isFollowUp, mentionsImage, imageMarker, isImageRefusal, IMAGE_SYSTEM_HINT, askPollinations, firstOf, classifierSystem, parseClassifier } from './imggen.js?v=3.12';
+import { BACKEND_URL, LOG_LOCAL_MODEL, ADSENSE_CLIENT, ADSENSE_SLOT } from './config.js?v=3.12';
+import { createAds, showAdsDialog, ADS_PRIVACY_NOTE } from './ads.js?v=3.12';
+import { createTelemetry } from './telemetry.js?v=3.12';
 
 const chats = new ChatStore(store);
 // журнал на сервере владельца: включается только если задан BACKEND_URL и пользователь согласился
@@ -515,6 +515,9 @@ async function tryImage(slot, hist, reply, refs, signal, force = null) {
   const prevImg = [...hist].reverse().find(m => m.role === 'assistant' && m.image && m.image.prompt);
   const lastA = [...hist].reverse().find(m => m.role === 'assistant');
   const prev = prevImg && lastA === prevImg ? prevImg.image.prompt : '';      // продолжение — только сразу после картинки
+  if (!force) { const ca = capabilityAnswer(lu.content); if (ca) {          // вопрос о возможностях — готовый ответ сайта, модель не вызываем
+    reply.content = ca; reply.reasoning = ''; reply.error = false; reply.label = 'Сайт · AI Hub'; reply.prov = 'site'; reply.model = 'site';
+    const nm = refs.wrap.querySelector('.name'); if (nm) nm.textContent = reply.label; return true; } }
   if (!force && isVideoRequest(lu.content) && detectImageIntent(lu.content) === 'no') {   // видео не умеем — честно текстом, без картинки
     reply.content = VIDEO_UNSUPPORTED; reply.reasoning = ''; reply.error = false; return true;
   }
@@ -574,7 +577,7 @@ async function runSlot(slot, userText, { regenerate = false, images = null } = {
       for (const x of messages) delete x.images;
     }
     if (trimmed) toast(`Старые сообщения (${trimmed}) не вошли в контекст модели`, { ms: 3500 });
-    if (pp.keyMode === 'required' && !getKey(pp.id)) { const { HttpError } = await import('./api.js?v=3.11'); throw new HttpError(401, ''); }
+    if (pp.keyMode === 'required' && !getKey(pp.id)) { const { HttpError } = await import('./api.js?v=3.12'); throw new HttpError(401, ''); }
     if (pp.custom && !S.customUrl.trim()) throw new Error('Укажите Base URL эндпоинта в блоке «Свой ключ».');
     if (pp.needsProxy && !baseOf(pp)) throw new Error('Для «' + pp.name + '» нужен свой CORS-прокси: разверните proxy/worker.js и укажите адрес в «Настройки → CORS-прокси».');
     if (!mm) throw new Error('Не выбрана модель.');

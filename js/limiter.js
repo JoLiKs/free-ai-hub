@@ -1,7 +1,7 @@
 /* Клиентская очередь запросов на провайдера: одновременность, минимальная пауза,
  * скользящее окно «N запросов за T мс» (на модель или на провайдера) и «штраф» после 429.
  * Вызывающий получает уведомления об ожидании (для видимого обратного отсчёта). */
-import { abortError } from './util.js?v=3.11';
+import { abortError } from './util.js?v=3.12';
 
 export class QueueWaitError extends Error { constructor(ms) { super('queue wait ' + ms); this.name = 'QueueWaitError'; this.waitMs = ms; } }
 

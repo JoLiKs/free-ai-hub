@@ -1,7 +1,7 @@
-import { safeImageUrl } from './imggen.js?v=3.11';
+import { safeImageUrl } from './imggen.js?v=3.12';
 /* История чатов в localStorage: индекс + отдельная запись на чат. Экспорт Markdown/JSON, импорт. */
-import { store as defaultStore } from './store.js?v=3.11';
-import { uid, slug } from './util.js?v=3.11';
+import { store as defaultStore } from './store.js?v=3.12';
+import { uid, slug } from './util.js?v=3.12';
 
 const MAX_CHATS = 200;
 

@@ -1,5 +1,5 @@
 /* Клиентская часть «модели в браузере». Один общий воркер; сторож (watchdog) не даёт ответу «висеть» бесконечно. */
-import { abortError } from './util.js?v=3.11';
+import { abortError } from './util.js?v=3.12';
 
 let worker = null, seq = 0;
 const pending = new Map();
@@ -16,7 +16,7 @@ function killWorker(message) {
 }
 function ensureWorker() {
   if (worker) return worker;
-  worker = new Worker(new URL('./local-worker.js?v=3.11', import.meta.url), { type: 'module' });
+  worker = new Worker(new URL('./local-worker.js?v=3.12', import.meta.url), { type: 'module' });
   worker.onmessage = e => { const d = e.data || {}; const h = pending.get(d.id); if (h) h(d); else if (d.type === 'error' && !d.id) failAll(d.message); };
   worker.onerror = e => { e.preventDefault && e.preventDefault(); killWorker('WORKER: ' + (e.message || 'не удалось запустить модуль модели')); };
   worker.onmessageerror = () => killWorker('WORKER: ошибка обмена данными с воркером');

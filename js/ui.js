@@ -1,5 +1,5 @@
 /* DOM-помощники: toast, баннер, диалог подтверждения, всплывающее окно (popover / bottom-sheet). */
-import { esc } from './util.js?v=3.11';
+import { esc } from './util.js?v=3.12';
 
 export const $ = id => document.getElementById(id);
 export const isMobile = () => matchMedia('(max-width: 820px)').matches;

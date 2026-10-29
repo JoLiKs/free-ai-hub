@@ -1,7 +1,7 @@
 /* Необязательный service worker: «сначала сеть, при её отсутствии — кэш». Нужен, чтобы приложение открывалось офлайн
  * (например, вместе с локальной моделью, уже скачанной в браузер). API-запросы к провайдерам и любые кросс-доменные запросы
  * (в т.ч. реклама Google: pagead2.googlesyndication.com, googleads.g.doubleclick.net) он НЕ перехватывает и не кэширует. */
-const CACHE = 'fah-v2-shell-3.13-capans2';
+const CACHE = 'fah-v2-shell-3.14-velora';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil((async () => {
   for (const k of await caches.keys()) if (k !== CACHE) await caches.delete(k);
@@ -13,6 +13,7 @@ self.addEventListener('fetch', e => {
   if (u.pathname === '/admin' || u.pathname.startsWith('/admin/') || u.pathname.startsWith('/api/admin')) return;   // админка: мимо SW (никакого кэша)
   if (u.pathname === '/buy' || u.pathname.startsWith('/buy/')) return;
   if (u.pathname.startsWith('/s/') || u.pathname === '/share' || u.pathname.startsWith('/share/')) return;   // общий диалог: мимо SW (никогда не отдаём вместо него чат)   // страница покупки: мимо SW (никогда не отдаём вместо неё чат)
+  if (u.pathname === '/velora' || u.pathname.startsWith('/velora/')) return;   // Velora (отдельное приложение) — мимо SW
   if (u.pathname.startsWith('/ads/')) return;   // рекламные iframe-страницы — мимо SW
   if (u.pathname.endsWith('/ads.txt') || u.pathname.startsWith('/api/')) return;   // ads.txt и /api/* (site-config) — всегда напрямую                        // ads.txt всегда напрямую с сервера
   e.respondWith((async () => {

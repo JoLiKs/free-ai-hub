@@ -1,14 +1,13 @@
 /* Отрисовка сообщений: аватары, пузыри, блок «Размышления», статус, действия. */
-import { esc, fmtTime, estimateTokens } from './util.js?v=3.13';
-import { renderMarkdown, splitThink } from './markdown.js?v=3.13';
-import { safeImageUrl, parseImageUrl, imageUrl, PAID_IMG_RE } from './imggen.js?v=3.13';
+import { esc, fmtTime, estimateTokens } from './util.js?v=3.15';
+import { renderMarkdown, splitThink } from './markdown.js?v=3.15';
+import { safeImageUrl, parseImageUrl, imageUrl, PAID_IMG_RE } from './imggen.js?v=3.15';
 
 const ICON = {
   copy: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>',
   regen: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg>',
   edit: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
   cont: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
-  tts: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L12 19V5L7.5 9.5z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>',
   dl: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
   del: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14M10 11v6M14 11v6M7 7l1 12h8l1-12M9 7V4h6v3"/></svg>'
 };
@@ -57,7 +56,6 @@ export function paintActions(refs, busy) {
     if (!(m._streaming)) {
       if (!m.error && m.image) h += actionBtn('dl', 'Скачать');
       if (!m.error && !m.image) h += actionBtn('copy', 'Копировать', ' data-what="msg"');
-      if (!m.error && !m.image && typeof speechSynthesis !== 'undefined') h += actionBtn('tts', 'Озвучить');
       if (canRegen && !busy) h += actionBtn('regen', m.error ? 'Повторить' : 'Заново');
       if (canRegen && !busy && !m.error && m.finish === 'length') h += actionBtn('cont', 'Продолжить');
     }

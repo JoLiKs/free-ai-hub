@@ -1,5 +1,5 @@
 /* Единое хранилище (localStorage с запасным in-memory вариантом для node-тестов). */
-import { makeStore } from './util.js?v=3.13';
+import { makeStore } from './util.js?v=3.15';
 
 function memoryStorage() {
   const m = new Map();

@@ -389,7 +389,6 @@ dialog.dialog h2{margin:0;font-size:18px}
 .msg-imgs .lost{font-size:12px;opacity:.8}
 .composer-card.drag{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
 
-.act.on{color:var(--accent);background:var(--accent-soft)}
 
 /* =====================================================================================================
    КИБЕР-ПАНК  —  :root.cyber (включается кнопкой «⚡ Кибер-панк» в шапке; всегда поверх тёмной темы,

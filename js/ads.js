@@ -8,7 +8,7 @@
  *  - любые ошибки (блокировщик рекламы, сеть) молча игнорируются и не влияют на чат;
  *  - без ADSENSE_SLOT рисовать нечего (авто-реклама через сам скрипт); с ним — одна плашка, скрытая, пока реклама не загрузится.
  * Модуль не трогает DOM на верхнем уровне (проверяется в Node). */
-import { store as defaultStore } from './store.js?v=3.13';
+import { store as defaultStore } from './store.js?v=3.15';
 
 export const CLIENT_RE = /^ca-pub-\d{10,20}$/;
 export const SLOT_RE = /^\d{5,20}$/;

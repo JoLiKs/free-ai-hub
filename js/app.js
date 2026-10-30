@@ -1,19 +1,19 @@
 /* Free AI Hub v2 — точка входа: собирает UI из модулей. Без сборки, без зависимостей. */
-import { esc, sleep, debounce, estimateTokens, fmtAgo, fmtBytes, abortError } from './util.js?v=3.13';
-import { store } from './store.js?v=3.13';
-import { PROVIDERS, pById, FALLBACK_ORDER, SYSTEM_PRESETS, SUGGESTIONS, supportsVision } from './providers.js?v=3.13';
-import { state, saveSettings, saveSettingsNow, saveKeys, getKey, slotPid, slotProvider, slotModel, setSlotModel, slotMsgs, isBusy, modelInfo, modelLabel } from './state.js?v=3.13';
-import { explainError, isFallbackWorthy, setProxy, baseOf } from './api.js?v=3.13';
-import { generate, prepareMessages } from './generate.js?v=3.13';
-import { getModels, staticModels, favs, healthStore, checkProvider, healthLabel, providerSummary, HEALTH_STALE } from './models.js?v=3.13';
-import { ChatStore, newChat, chatTitleFrom, exportMarkdown, exportName, shareMessages } from './chats.js?v=3.13';
-import { $, toast, announce, showBanner, confirmDialog, promptDialog, openPopover, closePopover, popoverOpen, isMobile } from './ui.js?v=3.13';
-import { createMsgNode, paintMsg, paintActions, setStatus, emptyStateNode } from './messages.js?v=3.13';
-import { localSupported, webgpuAvailable } from './local.js?v=3.13';
-import { capabilityAnswer, IMAGE_TEXT_HINT, stripMarker, emptyReplyText, detectImageIntent, isVideoRequest, isExplicitImageRequest, isCapabilityQuestion, VIDEO_UNSUPPORTED, planImage, imageUrl, isFollowUp, mentionsImage, imageMarker, isImageRefusal, IMAGE_SYSTEM_HINT, askPollinations, firstOf, classifierSystem, parseClassifier } from './imggen.js?v=3.13';
-import { BACKEND_URL, LOG_LOCAL_MODEL, ADSENSE_CLIENT, ADSENSE_SLOT } from './config.js?v=3.13';
-import { createAds, showAdsDialog, ADS_PRIVACY_NOTE } from './ads.js?v=3.13';
-import { createTelemetry } from './telemetry.js?v=3.13';
+import { esc, sleep, debounce, estimateTokens, fmtAgo, fmtBytes, abortError } from './util.js?v=3.15';
+import { store } from './store.js?v=3.15';
+import { PROVIDERS, pById, FALLBACK_ORDER, SYSTEM_PRESETS, SUGGESTIONS, supportsVision } from './providers.js?v=3.15';
+import { state, saveSettings, saveSettingsNow, saveKeys, getKey, slotPid, slotProvider, slotModel, setSlotModel, slotMsgs, isBusy, modelInfo, modelLabel } from './state.js?v=3.15';
+import { explainError, isFallbackWorthy, setProxy, baseOf } from './api.js?v=3.15';
+import { generate, prepareMessages } from './generate.js?v=3.15';
+import { getModels, staticModels, favs, healthStore, checkProvider, healthLabel, providerSummary, HEALTH_STALE } from './models.js?v=3.15';
+import { ChatStore, newChat, chatTitleFrom, exportMarkdown, exportName, shareMessages } from './chats.js?v=3.15';
+import { $, toast, announce, showBanner, confirmDialog, promptDialog, openPopover, closePopover, popoverOpen, isMobile } from './ui.js?v=3.15';
+import { createMsgNode, paintMsg, paintActions, setStatus, emptyStateNode } from './messages.js?v=3.15';
+import { localSupported, webgpuAvailable } from './local.js?v=3.15';
+import { capabilityAnswer, IMAGE_TEXT_HINT, stripMarker, emptyReplyText, detectImageIntent, isVideoRequest, isExplicitImageRequest, isCapabilityQuestion, VIDEO_UNSUPPORTED, planImage, imageUrl, isFollowUp, mentionsImage, imageMarker, isImageRefusal, IMAGE_SYSTEM_HINT, askPollinations, firstOf, classifierSystem, parseClassifier } from './imggen.js?v=3.15';
+import { BACKEND_URL, LOG_LOCAL_MODEL, ADSENSE_CLIENT, ADSENSE_SLOT } from './config.js?v=3.15';
+import { createAds, showAdsDialog, ADS_PRIVACY_NOTE } from './ads.js?v=3.15';
+import { createTelemetry } from './telemetry.js?v=3.15';
 
 const chats = new ChatStore(store);
 // журнал на сервере владельца: включается только если задан BACKEND_URL и пользователь согласился
@@ -417,20 +417,6 @@ function updateEst() {
   el.est.textContent = (el.input.value || ctx) ? `≈${t} ток. · контекст ≈${ctx}` : '';
 }
 
-/* ============================== озвучка ответа (Web Speech API, локально в браузере) ============================== */
-function speak(m, btn) {
-  const synth = window.speechSynthesis; if (!synth) return;
-  if (synth.speaking) { synth.cancel(); document.querySelectorAll('[data-act=tts].on').forEach(b => b.classList.remove('on')); if (btn.dataset.playing === '1') { btn.dataset.playing = ''; return; } }
-  const txt = m.content.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').replace(/```[\s\S]*?```/g, ' (блок кода) ').replace(/[*_`#>|~]/g, '').replace(/\s+/g, ' ').trim();
-  if (!txt) return;
-  const u = new SpeechSynthesisUtterance(txt.slice(0, 6000));
-  u.lang = /[а-яё]/i.test(txt) ? 'ru-RU' : 'en-US';
-  const done = () => { btn.classList.remove('on'); btn.dataset.playing = ''; };
-  u.onend = done; u.onerror = done;
-  btn.classList.add('on'); btn.dataset.playing = '1';
-  synth.speak(u);
-}
-
 /* ============================== вложения-картинки ============================== */
 const MAX_IMAGES = 3;
 let attachments = [];   // data-URL (JPEG/PNG, уменьшены до 1024 px)
@@ -577,7 +563,7 @@ async function runSlot(slot, userText, { regenerate = false, images = null } = {
       for (const x of messages) delete x.images;
     }
     if (trimmed) toast(`Старые сообщения (${trimmed}) не вошли в контекст модели`, { ms: 3500 });
-    if (pp.keyMode === 'required' && !getKey(pp.id)) { const { HttpError } = await import('./api.js?v=3.13'); throw new HttpError(401, ''); }
+    if (pp.keyMode === 'required' && !getKey(pp.id)) { const { HttpError } = await import('./api.js?v=3.15'); throw new HttpError(401, ''); }
     if (pp.custom && !S.customUrl.trim()) throw new Error('Укажите Base URL эндпоинта в блоке «Свой ключ».');
     if (pp.needsProxy && !baseOf(pp)) throw new Error('Для «' + pp.name + '» нужен свой CORS-прокси: разверните proxy/worker.js и укажите адрес в «Настройки → CORS-прокси».');
     if (!mm) throw new Error('Не выбрана модель.');
@@ -733,7 +719,7 @@ function renderChatList() {
 }
 async function openChat(id) {
   if (isBusy()) { toast('Дождитесь окончания ответа или нажмите «Стоп»', { kind: 'err' }); return; }
-  attachments = []; if (window.speechSynthesis) window.speechSynthesis.cancel();
+  attachments = [];
   const c = chats.get(id); if (!c) return;
   state.chat = c;
   if (c.provider && PROVIDERS.some(p => p.id === c.provider)) { S.provider = c.provider; if (c.model) S.models[c.provider] = c.model; }
@@ -751,7 +737,6 @@ async function afterProviderChange() {
 }
 function newChatAction() {
   if (isBusy()) stopAll();
-  if (window.speechSynthesis) window.speechSynthesis.cancel();
   attachments = [];
   if (state.chat.msgs.length) persist();
   state.chat = newChat(); S.lastChat = ''; saveSettings(); renderAll(); renderChatList(); updateEst(); el.input.value = ''; autosize(); el.input.focus();
@@ -928,7 +913,6 @@ function bind() {
     if (act.dataset.act === 'copy') { const txt = m.role === 'assistant' ? m.content.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim() : m.content; copyText(txt, act); }
     else if (act.dataset.act === 'regen') regenerate(slot);
     else if (act.dataset.act === 'edit') editLast();
-    else if (act.dataset.act === 'tts') speak(m, act);
     else if (act.dataset.act === 'dl') downloadImage(m, act);
     else if (act.dataset.act === 'cont') send('Продолжи ответ с того места, где остановился. Не повторяй уже написанное.');
   });

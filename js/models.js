@@ -1,8 +1,8 @@
 /* Списки моделей (кэш с TTL, «устаревшее показываем сразу — обновляем в фоне»),
  * проверка доступности («живая проверка») и избранное. */
-import { store as defaultStore } from './store.js?v=3.13';
-import { authHeaders, baseOf, httpError, explainError, HttpError, TimeoutError, chat } from './api.js?v=3.13';
-import { limiterFor } from './limiter.js?v=3.13';
+import { store as defaultStore } from './store.js?v=3.15';
+import { authHeaders, baseOf, httpError, explainError, HttpError, TimeoutError, chat } from './api.js?v=3.15';
+import { limiterFor } from './limiter.js?v=3.15';
 
 export const MODELS_TTL = 6 * 3600e3;
 export const HEALTH_FRESH = 30 * 60e3;     // «свежая» проверка

@@ -1,5 +1,5 @@
 // Детектор запросов картинок: 60+ фраз (явные, разговорные, с опечатками, без глагола, EN) + ложные срабатывания + продолжения.
-import { capabilityAnswer as ca, stripMarker, emptyReplyText, IMAGE_TEXT_HINT, detectImageIntent as d, isVideoRequest, isExplicitImageRequest as ex, isCapabilityQuestion as cq, isFollowUp, isImageRefusal, imageMarker, planImage } from '../js/imggen.js?v=3.13';
+import { capabilityAnswer as ca, stripMarker, emptyReplyText, IMAGE_TEXT_HINT, detectImageIntent as d, isVideoRequest, isExplicitImageRequest as ex, isCapabilityQuestion as cq, isFollowUp, isImageRefusal, imageMarker, planImage } from '../js/imggen.js?v=3.15';
 const YES = [ // ожидаем 'yes' или 'maybe' (идёт на генерацию/классификатор), но НЕ 'no'
   'картинка крысы', 'крыса картинкой', 'нарисуй мне крысу', 'а можешь картинку с крысой?', 'сгенерь крысу', 'фото крысы в шляпе',
   'Сделай картинку с крысой', 'можешь сделать картинку с крысой', 'хочу картинку крысы', 'Давай картинку с крысой', 'создай кртинку крысы',

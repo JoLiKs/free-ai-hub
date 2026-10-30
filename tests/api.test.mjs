@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
-import { readSSE, extractOpenAI, extractGemini, requestOnce, retryDelay, HttpError, explainError, buildRequest, StreamError, TimeoutError } from '../js/api.js?v=3.13';
-import { Limiter } from '../js/limiter.js?v=3.13';
-import { ChatStore, newChat, exportMarkdown } from '../js/chats.js?v=3.13';
-import { makeMemoryStore } from '../js/store.js?v=3.13';
-import { prepareMessages } from '../js/generate.js?v=3.13';
-import { getModels, classify } from '../js/models.js?v=3.13';
-import { pById } from '../js/providers.js?v=3.13';
+import { readSSE, extractOpenAI, extractGemini, requestOnce, retryDelay, HttpError, explainError, buildRequest, StreamError, TimeoutError } from '../js/api.js?v=3.15';
+import { Limiter } from '../js/limiter.js?v=3.15';
+import { ChatStore, newChat, exportMarkdown } from '../js/chats.js?v=3.15';
+import { makeMemoryStore } from '../js/store.js?v=3.15';
+import { prepareMessages } from '../js/generate.js?v=3.15';
+import { getModels, classify } from '../js/models.js?v=3.15';
+import { pById } from '../js/providers.js?v=3.15';
 
 let n = 0; const tests = [];
 const t = (name, fn) => tests.push([name, fn]);
